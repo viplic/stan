@@ -16,12 +16,18 @@ export async function initStore() {
     await postgresSql`
       create table if not exists users (
         id text primary key,
-        name text not null,
+        name text not null default '',
         email text unique not null,
+        phone text not null default '',
         password_hash text not null,
+        email_verified boolean not null default false,
+        verification_token text,
         created_at timestamptz not null default now()
       )
     `;
+    await postgresSql`alter table users add column if not exists phone text not null default ''`;
+    await postgresSql`alter table users add column if not exists email_verified boolean not null default false`;
+    await postgresSql`alter table users add column if not exists verification_token text`;
     await postgresSql`
       create table if not exists uploads (
         id text primary key,
@@ -66,19 +72,26 @@ export async function findUserById(id) {
   return db.users.find((user) => user.id === id) || null;
 }
 
-export async function createUser({ name, email, passwordHash }) {
+export async function createUser({ email, phone, passwordHash, verificationToken }) {
   await initStore();
   const user = {
     id: cryptoRandomId("usr"),
-    name: String(name || "").trim(),
+    name: "",
     email: normalizeEmail(email),
+    phone: String(phone || "").trim(),
     passwordHash,
+    emailVerified: false,
+    verificationToken,
     createdAt: new Date().toISOString()
   };
   if (postgresSql) {
     await postgresSql`
       insert into users (id, name, email, password_hash, created_at)
       values (${user.id}, ${user.name}, ${user.email}, ${passwordHash}, ${user.createdAt})
+    `;
+    await postgresSql`
+      update users set phone = ${user.phone}, email_verified = false, verification_token = ${verificationToken}
+      where id = ${user.id}
     `;
     return user;
   }
@@ -88,20 +101,21 @@ export async function createUser({ name, email, passwordHash }) {
   return user;
 }
 
-export async function createUpload({ userId, title, listingType, files }) {
+export async function createUpload({ userId, title, listingType, metadata, files }) {
   await initStore();
   const upload = {
     id: cryptoRandomId("upl"),
     userId,
     title: String(title || "Novi oglas").trim().slice(0, 120),
     listingType: String(listingType || "stan").trim().slice(0, 32),
+    metadata: metadata || {},
     files,
     createdAt: new Date().toISOString()
   };
   if (postgresSql) {
     await postgresSql`
       insert into uploads (id, user_id, title, listing_type, files, created_at)
-      values (${upload.id}, ${userId}, ${upload.title}, ${upload.listingType}, ${JSON.stringify(files)}, ${upload.createdAt})
+      values (${upload.id}, ${userId}, ${upload.title}, ${upload.listingType}, ${JSON.stringify({ files, metadata: upload.metadata })}, ${upload.createdAt})
     `;
     return upload;
   }
@@ -109,6 +123,27 @@ export async function createUpload({ userId, title, listingType, files }) {
   db.uploads.push(upload);
   await writeJson(db);
   return upload;
+}
+
+export async function verifyUserEmail(token) {
+  await initStore();
+  if (!token) return null;
+  if (postgresSql) {
+    const rows = await postgresSql`
+      update users
+      set email_verified = true, verification_token = null
+      where verification_token = ${token}
+      returning *
+    `;
+    return rows[0] ? mapUser(rows[0]) : null;
+  }
+  const db = await readJson();
+  const user = db.users.find((item) => item.verificationToken === token);
+  if (!user) return null;
+  user.emailVerified = true;
+  user.verificationToken = null;
+  await writeJson(db);
+  return user;
 }
 
 export async function listUploads(userId) {
@@ -127,6 +162,7 @@ export async function listUploads(userId) {
       title: row.title,
       listingType: row.listing_type,
       files: row.files,
+      metadata: row.files?.metadata || {},
       createdAt: row.created_at
     }));
   }
@@ -138,8 +174,10 @@ export function publicUser(user) {
   if (!user) return null;
   return {
     id: user.id,
-    name: user.name,
-    email: user.email
+    name: user.name || user.email,
+    email: user.email,
+    phone: user.phone,
+    emailVerified: Boolean(user.emailVerified)
   };
 }
 
@@ -158,7 +196,10 @@ function mapUser(row) {
     id: row.id,
     name: row.name,
     email: row.email,
+    phone: row.phone,
     passwordHash: row.password_hash,
+    emailVerified: row.email_verified,
+    verificationToken: row.verification_token,
     createdAt: row.created_at
   };
 }

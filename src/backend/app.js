@@ -1,5 +1,6 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import crypto from "node:crypto";
 import express from "express";
 import formidable from "formidable";
 import {
@@ -20,7 +21,8 @@ import {
   findUserById,
   initStore,
   listUploads,
-  publicUser
+  publicUser,
+  verifyUserEmail
 } from "./store.js";
 
 const MAX_UPLOAD_SIZE = 1024 * 1024 * 120;
@@ -41,6 +43,14 @@ export function createApiApp() {
     response.json({ ok: true });
   });
 
+  app.get("/api/auth/verify", async (request, response) => {
+    const user = await verifyUserEmail(String(request.query.token || ""));
+    if (!user) return response.status(400).send("Verifikacioni link nije ispravan ili je istekao.");
+    const token = createSessionToken(user.id);
+    response.setHeader("Set-Cookie", sessionCookie(token, request));
+    response.redirect("/#upload");
+  });
+
   app.get("/api/auth/me", async (request, response) => {
     const user = await requireUser(request);
     response.json({ user: publicUser(user) });
@@ -54,19 +64,25 @@ export function createApiApp() {
     if (existing) return response.status(409).json({ error: "email_exists", message: "Nalog sa ovim emailom već postoji." });
 
     const user = await createUser({
-      name: request.body.name,
       email: request.body.email,
+      phone: request.body.phone,
+      verificationToken: crypto.randomBytes(24).toString("hex"),
       passwordHash: await hashPassword(request.body.password)
     });
-    const token = createSessionToken(user.id);
-    response.setHeader("Set-Cookie", sessionCookie(token, request));
-    response.status(201).json({ user: publicUser(user) });
+    await sendVerificationEmail(request, user);
+    response.status(201).json({
+      verificationRequired: true,
+      message: "Poslali smo verifikacioni email. Potvrdite email pre korišćenja aplikacije."
+    });
   });
 
   app.post("/api/auth/login", async (request, response) => {
     const user = await findUserByEmail(request.body?.email);
     if (!user || !(await verifyPassword(request.body?.password, user.passwordHash))) {
       return response.status(401).json({ error: "invalid_login", message: "Email ili lozinka nisu ispravni." });
+    }
+    if (!user.emailVerified) {
+      return response.status(403).json({ error: "email_not_verified", message: "Potvrdite email pre korišćenja aplikacije." });
     }
     const token = createSessionToken(user.id);
     response.setHeader("Set-Cookie", sessionCookie(token, request));
@@ -112,6 +128,14 @@ export function createApiApp() {
         userId: user.id,
         title: firstField(fields.title) || "Novi oglas",
         listingType: firstField(fields.listingType) || "stan",
+        metadata: {
+          purpose: firstField(fields.purpose) || "",
+          price: firstField(fields.price) || "",
+          size: firstField(fields.size) || "",
+          location: firstField(fields.location) || "",
+          newBuild: firstField(fields.newBuild) === "true",
+          furnished: firstField(fields.furnished) === "true"
+        },
         files: incomingFiles.map((file) => ({
           name: file.originalFilename,
           type: file.mimetype,
@@ -128,6 +152,10 @@ export function createApiApp() {
 async function requireUser(request, response = null) {
   const payload = verifySessionToken(readSessionToken(request));
   const user = payload ? await findUserById(payload.userId) : null;
+  if (user && !user.emailVerified) {
+    if (response) response.status(403).json({ error: "email_not_verified", message: "Potvrdite email pre korišćenja aplikacije." });
+    return null;
+  }
   if (!user && response) {
     response.status(401).json({ error: "auth_required", message: "Prijavite se da nastavite." });
   }
@@ -136,4 +164,26 @@ async function requireUser(request, response = null) {
 
 function firstField(value) {
   return Array.isArray(value) ? value[0] : value;
+}
+
+async function sendVerificationEmail(request, user) {
+  const origin = `${request.headers["x-forwarded-proto"] || request.protocol || "http"}://${request.headers.host}`;
+  const link = `${origin}/api/auth/verify?token=${encodeURIComponent(user.verificationToken)}`;
+  if (process.env.RESEND_API_KEY && process.env.EMAIL_FROM) {
+    await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        from: process.env.EMAIL_FROM,
+        to: user.email,
+        subject: "Verifikacija RoomWalk naloga",
+        html: `<p>Potvrdite email da biste koristili RoomWalk.</p><p><a href="${link}">Verifikuj email</a></p>`
+      })
+    });
+    return;
+  }
+  console.log(`RoomWalk verification link for ${user.email}: ${link}`);
 }

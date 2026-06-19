@@ -3,6 +3,23 @@ import "./styles.css";
 let pc;
 let openAuthDialog = () => {};
 
+const SERBIAN_CITIES = [
+  "Aleksandrovac", "Aleksinac", "Apatin", "Aranđelovac", "Bačka Palanka", "Bačka Topola", "Bečej", "Beograd",
+  "Bor", "Čačak", "Ćuprija", "Despotovac", "Dimitrovgrad", "Jagodina", "Kikinda", "Kladovo", "Kragujevac",
+  "Kraljevo", "Kruševac", "Lazarevac", "Leskovac", "Loznica", "Majdanpek", "Mladenovac", "Negotin", "Niš",
+  "Novi Pazar", "Novi Sad", "Obrenovac", "Pančevo", "Paraćin", "Pirot", "Požarevac", "Požega", "Priboj",
+  "Prokuplje", "Ruma", "Senta", "Smederevo", "Sombor", "Sremska Mitrovica", "Stara Pazova", "Subotica",
+  "Šabac", "Užice", "Valjevo", "Vranje", "Vrbas", "Vršac", "Zaječar", "Zrenjanin"
+];
+
+const ROOM_PATH = {
+  living: [-2.8, 1.55, -0.85, -24],
+  kitchen: [3.25, 1.55, -0.85, 28],
+  bedroom: [-3.15, 1.55, 2.3, -150],
+  bath: [3.65, 1.55, 2.25, 138],
+  hall: [0.25, 1.55, 2.25, 180]
+};
+
 const listings = [
   {
     id: "vračar-01",
@@ -19,38 +36,6 @@ const listings = [
     status: "3D spreman",
     quality: 92,
     image: "linear-gradient(135deg, rgba(20, 184, 166, .92), rgba(14, 116, 144, .78)), url('https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1200&q=80')"
-  },
-  {
-    id: "novi-bg-02",
-    title: "Moderan dvosoban stan",
-    location: "Novi Beograd, Blok 67",
-    price: "980 EUR",
-    priceValue: 980,
-    size: "51 m2",
-    sizeValue: 51,
-    rooms: "2.0",
-    floor: "7/9",
-    city: "Beograd",
-    type: "stan",
-    status: "Preview",
-    quality: 76,
-    image: "linear-gradient(135deg, rgba(59, 130, 246, .86), rgba(15, 23, 42, .70)), url('https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80')"
-  },
-  {
-    id: "zemun-03",
-    title: "Porodični duplex sa terasom",
-    location: "Zemun, Gardoš",
-    price: "1.650 EUR",
-    priceValue: 1650,
-    size: "88 m2",
-    sizeValue: 88,
-    rooms: "4.0",
-    floor: "1/2",
-    city: "Beograd",
-    type: "kuća",
-    status: "HD obrada",
-    quality: 84,
-    image: "linear-gradient(135deg, rgba(245, 158, 11, .80), rgba(87, 83, 78, .66)), url('https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?auto=format&fit=crop&w=1200&q=80')"
   }
 ];
 
@@ -104,58 +89,62 @@ document.querySelector("#app").innerHTML = `
     <section class="hero-section">
       <div class="hero-copy">
         <p class="eyebrow">3D oglasi za stanove</p>
-        <h1>Stanovi i kuće kroz koje možeš da prođeš.</h1>
+        <h1>Pogledaj oglase iz svoje sobe.</h1>
         <p>
-          Pregledaj oglase kao da si već tamo: sobe, tlocrt, hotspotovi, auto tour i kontakt sa stanodavcem iz jednog laganog web iskustva.
+          Kao da si već tamo: prostorije, lokacija i kontakt sa stanodavcem sve u jednom mestu.
         </p>
         <div class="hero-actions">
           <a class="primary-link" href="#listings">Pogledaj oglase</a>
           <a class="secondary-link" href="#viewer">Otvori demo obilazak</a>
         </div>
       </div>
-      <div class="hero-signal">
-        <div class="signal-row"><span>Aktivni oglasi</span><strong>128</strong></div>
-        <div class="signal-row"><span>Gradovi</span><strong>12</strong></div>
-        <div class="signal-row"><span>3D obilasci</span><strong>84</strong></div>
-      </div>
-    </section>
-
-    <section class="metric-band" aria-label="Metrike platforme">
-      <article><strong>3D</strong><span>walkthrough za svaki oglas</span></article>
-      <article><strong>Auto tour</strong><span>vođena tura kroz prostor</span></article>
-      <article><strong>Hotspotovi</strong><span>detalji za sobe i opremu</span></article>
-      <article><strong>Kontakt</strong><span>zakazivanje i poruke</span></article>
-    </section>
-
-    <section id="listings" class="section-heading">
-      <div>
-        <p class="eyebrow">Marketplace</p>
-        <h2>Oglasi sa 3D obilaskom</h2>
-      </div>
-      <div class="filter-row listing-filters">
-        <select id="cityFilter" aria-label="Grad">
-          <option value="">Svi gradovi</option>
-          <option value="Beograd">Beograd</option>
-          <option value="Novi Sad">Novi Sad</option>
-          <option value="Niš">Niš</option>
-        </select>
+      <div class="hero-signal hero-search">
+        <p class="eyebrow">Filteri za pretragu</p>
+        <select id="cityFilter" aria-label="Grad"></select>
         <select id="priceFilter" aria-label="Cena">
           <option value="">Cena</option>
+          <option value="500">Do 500 EUR</option>
+          <option value="800">Do 800 EUR</option>
           <option value="1000">Do 1.000 EUR</option>
           <option value="1300">Do 1.300 EUR</option>
           <option value="1700">Do 1.700 EUR</option>
+          <option value="2500">Do 2.500 EUR</option>
         </select>
         <select id="sizeFilter" aria-label="Kvadratura">
           <option value="">Kvadratura</option>
+          <option value="30">30+ m2</option>
           <option value="45">45+ m2</option>
           <option value="60">60+ m2</option>
           <option value="80">80+ m2</option>
+          <option value="100">100+ m2</option>
         </select>
         <select id="typeFilter" aria-label="Tip nekretnine">
           <option value="">Stan ili kuća</option>
           <option value="stan">Stan</option>
           <option value="kuća">Kuća</option>
         </select>
+        <button class="primary-button" id="searchButton">Pretraži</button>
+      </div>
+    </section>
+
+    <section class="metric-band" aria-label="Metrike platforme">
+      <article><strong>3D</strong><span>walkthrough za svaki oglas</span></article>
+      <article><strong>Auto tour</strong><span>sam biraš da te vodi kroz stan</span></article>
+      <article><strong>Detalji</strong><span>tačke u prostoriji</span></article>
+      <article><strong>Kontakt</strong><span>zakazivanje i poruke</span></article>
+    </section>
+
+    <section class="metric-band market-stats" aria-label="Pregled platforme">
+      <article><strong>128</strong><span>aktivni oglasi</span></article>
+      <article><strong>52</strong><span>gradovi u Srbiji</span></article>
+      <article><strong>84</strong><span>3D obilasci</span></article>
+      <article><strong>24/7</strong><span>pregled iz sobe</span></article>
+    </section>
+
+    <section id="listings" class="section-heading">
+      <div>
+        <p class="eyebrow">Marketplace</p>
+        <h2>Oglasi sa 3D obilaskom</h2>
       </div>
     </section>
 
@@ -166,7 +155,32 @@ document.querySelector("#app").innerHTML = `
         <div class="panel-heading">
           <p class="eyebrow">Upload pipeline</p>
           <h2>Dodaj materijal za novi 3D oglas</h2>
-          <p>Upload je dostupan samo prijavljenim korisnicima. Nakon prijave možeš da testiraš sa nekoliko slika i odmah vidiš preview u 3D prostoru.</p>
+          <p>Upload i uputstvo se prikazuju tek nakon verifikovanog naloga.</p>
+        </div>
+        <div class="capture-guide" id="captureGuide" hidden>
+          <strong>Pre upload-a</strong>
+          <span>Snimaj polako, uđi u svaku prostoriju, zadrži kameru 2-3 sekunde na centralnim delovima sobe i izbegni nagle pokrete.</span>
+        </div>
+        <div class="listing-form" id="listingForm" hidden>
+          <label>Tip oglasa
+            <select id="listingPurpose">
+              <option value="izdavanje">Izdavanje</option>
+              <option value="prodaja">Prodaja</option>
+            </select>
+          </label>
+          <label>Cena
+            <input id="listingPrice" inputmode="decimal" placeholder="npr. 850 EUR" />
+          </label>
+          <label>Kvadratura
+            <input id="listingSize" inputmode="decimal" placeholder="npr. 64 m2" />
+          </label>
+          <label>Lokacija
+            <input id="listingLocation" placeholder="Grad, opština, ulica" />
+          </label>
+          <div class="checkbox-row">
+            <label><input id="newBuild" type="checkbox" /> Novogradnja</label>
+            <label><input id="furnished" type="checkbox" /> Namešten</label>
+          </div>
         </div>
         <label class="dropzone" id="dropzone">
           <input id="fileInput" type="file" accept="image/*,video/*" multiple />
@@ -264,8 +278,8 @@ document.querySelector("#app").innerHTML = `
         <button type="button" data-auth-mode="signup">Signup</button>
       </div>
       <label id="nameField" hidden>
-        Ime
-        <input id="authName" name="name" autocomplete="name" />
+        Broj telefona
+        <input id="authPhone" name="phone" autocomplete="tel" />
       </label>
       <label>
         Email
@@ -286,6 +300,7 @@ renderListings();
 renderListingDetail();
 renderPipeline();
 bindUi();
+populateCityFilter();
 prepareViewerLoading();
 
 function renderListings() {
@@ -495,6 +510,8 @@ function updateAuthUi() {
   document.querySelector("#logoutButton").hidden = !loggedIn;
   document.querySelector("#uploadLock").hidden = loggedIn;
   document.querySelector("#memberTools").hidden = !loggedIn;
+  document.querySelector("#captureGuide").hidden = !loggedIn;
+  document.querySelector("#listingForm").hidden = !loggedIn;
   document.querySelector("#fileInput").disabled = !loggedIn;
   document.querySelector("#processButton").disabled = !loggedIn;
   document.querySelector("#dropzone").classList.toggle("locked", !loggedIn);
@@ -515,8 +532,8 @@ function bindAuthDialog() {
     event.preventDefault();
     message.textContent = "";
     const payload = {
-      name: document.querySelector("#authName").value,
       email: document.querySelector("#authEmail").value,
+      phone: document.querySelector("#authPhone").value,
       password: document.querySelector("#authPassword").value
     };
     try {
@@ -528,7 +545,8 @@ function bindAuthDialog() {
       state.user = data.user;
       updateAuthUi();
       dialog.close();
-      setUploadStatus("Nalog je spreman");
+      setUploadStatus(data.verificationRequired ? "Proverite email" : "Nalog je spreman");
+      if (data.verificationRequired) alert(data.message);
     } catch (error) {
       message.textContent = error.message || "Pokušajte ponovo.";
     }
@@ -569,19 +587,36 @@ function bindFilters() {
     document.querySelector(selector).addEventListener("change", (event) => {
       state.filters[key] = event.target.value;
       renderListings();
+      window.location.hash = "pretraga";
     });
+  });
+  document.querySelector("#searchButton").addEventListener("click", () => {
+    renderListings();
+    document.querySelector("#listings").scrollIntoView({ behavior: "smooth" });
+    window.location.hash = "pretraga";
   });
 }
 
 async function submitUpload() {
   const form = new FormData();
-  form.append("title", state.selectedListing.title);
+  form.append("title", document.querySelector("#listingLocation").value || state.selectedListing.title);
   form.append("listingType", state.selectedListing.type);
+  form.append("purpose", document.querySelector("#listingPurpose").value);
+  form.append("price", document.querySelector("#listingPrice").value);
+  form.append("size", document.querySelector("#listingSize").value);
+  form.append("location", document.querySelector("#listingLocation").value);
+  form.append("newBuild", document.querySelector("#newBuild").checked ? "true" : "false");
+  form.append("furnished", document.querySelector("#furnished").checked ? "true" : "false");
   state.files.forEach((file) => form.append("files", file));
   return fetchJson("/api/uploads", {
     method: "POST",
     body: form
   });
+}
+
+function populateCityFilter() {
+  const cityFilter = document.querySelector("#cityFilter");
+  cityFilter.innerHTML = `<option value="">Svi gradovi</option>${SERBIAN_CITIES.map((city) => `<option value="${city}">${city}</option>`).join("")}`;
 }
 
 function setUploadStatus(text) {
@@ -862,14 +897,7 @@ function updateWalk(dt) {
 }
 
 function jumpToRoom(room) {
-  const positions = {
-    living: [-2.8, 1.55, -0.85, -24],
-    kitchen: [3.25, 1.55, -0.85, 28],
-    bedroom: [-3.15, 1.55, 2.3, -150],
-    bath: [3.65, 1.55, 2.25, 138],
-    hall: [0.25, 1.55, 2.25, 180]
-  };
-  const [x, y, z, yaw] = positions[room] || positions.living;
+  const [x, y, z, yaw] = ROOM_PATH[room] || ROOM_PATH.living;
   state.camera.setPosition(x, y, z);
   state.yaw = yaw;
   state.pitch = -6;
@@ -889,10 +917,41 @@ async function toggleAutoTour() {
   while (state.autoTour) {
     for (const room of ["living", "kitchen", "bedroom", "bath", "hall"]) {
       if (!state.autoTour) break;
-      jumpToRoom(room);
-      await wait(1100);
+      await walkToRoom(room, 1800);
+      await wait(450);
     }
   }
+}
+
+async function walkToRoom(room, durationMs) {
+  const target = ROOM_PATH[room] || ROOM_PATH.living;
+  const start = state.camera.getPosition().clone();
+  const startYaw = state.yaw;
+  const startPitch = state.pitch;
+  const startTime = performance.now();
+  return new Promise((resolve) => {
+    const step = (now) => {
+      const progress = clamp((now - startTime) / durationMs, 0, 1);
+      const eased = progress < 0.5 ? 2 * progress * progress : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+      state.camera.setPosition(
+        start.x + (target[0] - start.x) * eased,
+        1.55,
+        start.z + (target[2] - start.z) * eased
+      );
+      state.yaw = startYaw + shortestAngle(startYaw, target[3]) * eased;
+      state.pitch = startPitch + (-6 - startPitch) * eased;
+      if (progress < 1 && state.autoTour) requestAnimationFrame(step);
+      else {
+        document.querySelectorAll("[data-room]").forEach((button) => button.classList.toggle("active", button.dataset.room === room));
+        resolve();
+      }
+    };
+    requestAnimationFrame(step);
+  });
+}
+
+function shortestAngle(from, to) {
+  return ((((to - from) % 360) + 540) % 360) - 180;
 }
 
 function applyUploadedTextures() {
