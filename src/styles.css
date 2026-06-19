@@ -2,13 +2,14 @@
 
 :root {
   color-scheme: dark;
-  --bg: #0b0f0e;
-  --surface: #121816;
-  --surface-2: #19211f;
-  --ink: #f4f7f3;
-  --muted: #9aa7a0;
-  --line: rgba(255, 255, 255, 0.1);
+  --bg: #0f1412;
+  --surface: #1b2421;
+  --surface-2: #1b2421;
+  --ink: #f8fafc;
+  --muted: #a7b0aa;
+  --line: #2a3430;
   --accent: #2dd4bf;
+  --accent-hover: #14b8a6;
   --accent-2: #f59e0b;
   --blue: #60a5fa;
   --danger: #fb7185;
@@ -28,7 +29,7 @@ body {
   margin: 0;
   min-width: 320px;
   background:
-    linear-gradient(180deg, rgba(11, 15, 14, 0.72), #0b0f0e 78%),
+    linear-gradient(180deg, rgba(15, 20, 18, 0.78), #0f1412 78%),
     url("https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?auto=format&fit=crop&w=2400&q=80") center top / cover fixed;
   color: var(--ink);
 }
@@ -70,7 +71,7 @@ select option {
 
 button:hover,
 a:hover {
-  border-color: rgba(45, 212, 191, 0.55);
+  border-color: var(--accent-hover);
 }
 
 main {
@@ -85,12 +86,12 @@ main {
   z-index: 20;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   gap: 18px;
   height: 66px;
   padding: 0 max(16px, calc((100vw - 1420px) / 2));
   border-bottom: 1px solid var(--line);
-  background: rgba(9, 13, 12, 0.82);
+  background: rgba(15, 20, 18, 0.92);
   backdrop-filter: blur(18px);
 }
 
@@ -106,20 +107,28 @@ main {
 }
 
 .brand {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
   color: var(--ink);
   text-decoration: none;
   font-weight: 800;
 }
 
-.brand-mark {
-  display: grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius);
-  background: #2dd4bf;
-  color: #04201c;
-  font-size: 13px;
+.brand img {
+  display: block;
+  width: 132px;
+  height: auto;
+  max-height: 46px;
+  object-fit: contain;
+}
+
+.nav-left {
+  margin-right: auto;
+}
+
+.account-actions {
+  margin-left: auto;
 }
 
 .nav-links a {
@@ -192,6 +201,22 @@ main {
   border: 1px solid #2dd4bf;
   background: #2dd4bf;
   color: #04201c;
+}
+
+.primary-small-button {
+  min-height: 40px;
+  padding: 0 14px;
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #04201c;
+  font-weight: 800;
+}
+
+.primary-link:hover,
+.primary-button:hover,
+.primary-small-button:hover {
+  border-color: var(--accent-hover);
+  background: var(--accent-hover);
 }
 
 .secondary-link,
@@ -833,6 +858,20 @@ h2 {
   width: 100%;
 }
 
+.terms-field {
+  grid-template-columns: 18px minmax(0, 1fr) !important;
+  align-items: start;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.terms-field input {
+  width: 18px;
+  min-height: 18px;
+  margin-top: 2px;
+  accent-color: var(--accent);
+}
+
 .auth-tabs {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -902,6 +941,52 @@ h2 {
   font-size: 12px;
 }
 
+.site-footer {
+  width: min(1420px, calc(100% - 32px));
+  margin: 36px auto 0;
+  padding: 34px 0 44px;
+  border-top: 1px solid var(--line);
+}
+
+.footer-logo {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 26px;
+}
+
+.footer-logo img {
+  width: 150px;
+  height: auto;
+  object-fit: contain;
+}
+
+.footer-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24px;
+}
+
+.footer-grid section {
+  display: grid;
+  gap: 9px;
+}
+
+.footer-grid h3 {
+  margin: 0 0 6px;
+  color: var(--ink);
+  font-size: 15px;
+}
+
+.footer-grid a {
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 14px;
+}
+
+.footer-grid a:hover {
+  color: var(--accent);
+}
+
 @media (max-width: 1040px) {
   .hero-section,
   .product-grid,
@@ -933,6 +1018,10 @@ h2 {
     padding: 12px 10px;
   }
 
+  .brand img {
+    width: 104px;
+  }
+
   .nav-links {
     display: none;
   }
@@ -958,7 +1047,8 @@ h2 {
   .upload-summary,
   .mode-picker,
   .listing-form,
-  .admin-dashboard {
+  .admin-dashboard,
+  .footer-grid {
     grid-template-columns: 1fr;
   }
 

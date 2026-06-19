@@ -34,8 +34,43 @@ const listings = [
     city: "Beograd",
     type: "stan",
     status: "3D spreman",
+    paid: true,
     quality: 92,
     image: "linear-gradient(135deg, rgba(20, 184, 166, .92), rgba(14, 116, 144, .78)), url('https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1200&q=80')"
+  },
+  {
+    id: "dorćol-02",
+    title: "Moderan stan na Dorćolu",
+    location: "Dorćol, Beograd",
+    price: "980 EUR",
+    priceValue: 980,
+    size: "52 m2",
+    sizeValue: 52,
+    rooms: "2.0",
+    floor: "3/5",
+    city: "Beograd",
+    type: "stan",
+    status: "3D spreman",
+    paid: true,
+    quality: 88,
+    image: "linear-gradient(135deg, rgba(45, 212, 191, .82), rgba(15, 20, 18, .58)), url('https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80')"
+  },
+  {
+    id: "novi-sad-03",
+    title: "Namešten stan kod keja",
+    location: "Liman, Novi Sad",
+    price: "720 EUR",
+    priceValue: 720,
+    size: "48 m2",
+    sizeValue: 48,
+    rooms: "1.5",
+    floor: "5/8",
+    city: "Novi Sad",
+    type: "stan",
+    status: "3D spreman",
+    paid: true,
+    quality: 84,
+    image: "linear-gradient(135deg, rgba(20, 184, 166, .76), rgba(27, 36, 33, .72)), url('https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?auto=format&fit=crop&w=1200&q=80')"
   }
 ];
 
@@ -69,19 +104,18 @@ const state = {
 
 document.querySelector("#app").innerHTML = `
   <header class="topbar">
-    <a class="brand" href="#listings" aria-label="RoomWalk početna">
-      <span class="brand-mark">RW</span>
-      <span>RoomWalk</span>
-    </a>
-    <nav class="nav-links">
+    <nav class="nav-links nav-left">
       <a href="#listings">Oglasi</a>
-      <a href="#upload">Upload</a>
       <a href="#viewer">3D obilazak</a>
     </nav>
+    <a class="brand" href="#listings" aria-label="stan360 početna">
+      <img src="/assets/stan360-logo.png" alt="stan360" />
+    </a>
     <div class="account-actions">
       <span id="accountLabel"></span>
       <button class="ghost-button" id="postListingButton" hidden>Postavi oglas</button>
       <button class="ghost-button" id="loginButton">Login</button>
+      <button class="primary-small-button" id="signupButton">Signup</button>
       <button class="ghost-button" id="logoutButton" hidden>Logout</button>
     </div>
   </header>
@@ -262,10 +296,38 @@ document.querySelector("#app").innerHTML = `
     </section>
   </main>
 
+  <footer class="site-footer">
+    <div class="footer-logo"><img src="/assets/stan360-logo.png" alt="stan360" /></div>
+    <div class="footer-grid">
+      <section>
+        <h3>Korisno</h3>
+        <a href="#">O nama</a>
+        <a href="#">Knjiga o stan360</a>
+        <a href="#">stan360 Blog</a>
+        <a href="#">stan360 Karijere</a>
+        <a href="#">Saveti za bezbednost</a>
+        <a href="#">Pomoć i kontakt</a>
+      </section>
+      <section>
+        <h3>Kontakt za medije</h3>
+        <a href="#">Kontakt</a>
+        <a href="#">Copyright Infringement</a>
+      </section>
+      <section>
+        <h3>Pravila i uslovi</h3>
+        <a href="#">Pravila i uslovi</a>
+        <a href="#">Pravila i uslovi zakazivanja</a>
+        <a href="#">Polisa o poštovanju privatnosti</a>
+        <a href="#">Polisa o fer korišćenju</a>
+        <a href="#">Prava i obaveze prodavaca</a>
+      </section>
+    </div>
+  </footer>
+
   <dialog class="auth-dialog" id="authDialog">
     <form class="auth-card" id="authForm" method="dialog">
       <button class="dialog-close" type="button" value="cancel" aria-label="Zatvori">×</button>
-      <p class="eyebrow">RoomWalk nalog</p>
+      <p class="eyebrow">stan360 nalog</p>
       <h2 id="authTitle">Login</h2>
       <div class="auth-tabs">
         <button type="button" class="active" data-auth-mode="login">Login</button>
@@ -283,6 +345,10 @@ document.querySelector("#app").innerHTML = `
         Lozinka
         <input id="authPassword" name="password" type="password" autocomplete="current-password" minlength="8" required />
       </label>
+      <label class="terms-field" id="termsField" hidden>
+        <input id="termsAccepted" type="checkbox" />
+        <span>Prihvatam politiku korišćenja i uslove platforme.</span>
+      </label>
       <button class="primary-button" id="authSubmitButton">Nastavi</button>
       <p class="form-message" id="authMessage"></p>
     </form>
@@ -291,8 +357,8 @@ document.querySelector("#app").innerHTML = `
   <dialog class="admin-dialog" id="adminDialog">
     <form class="auth-card" id="adminForm" method="dialog">
       <button class="dialog-close" type="button" id="adminCloseButton" aria-label="Zatvori">×</button>
-      <p class="eyebrow">Master admin</p>
-      <h2>Admin dashboard</h2>
+      <p class="eyebrow">Pristup</p>
+      <h2>Dashboard</h2>
       <label>
         Email
         <input id="adminEmail" type="email" autocomplete="username" required />
@@ -309,6 +375,7 @@ document.querySelector("#app").innerHTML = `
 `;
 
 await bootAccount();
+trackVisit();
 renderListings();
 renderListingDetail();
 renderPipeline();
@@ -319,7 +386,8 @@ handleInitialRoute();
 
 function renderListings() {
   const grid = document.querySelector("#listingGrid");
-  const filteredListings = listings.filter((listing) => {
+  const baseListings = [...listings].sort((a, b) => Number(b.paid) - Number(a.paid));
+  const filteredListings = baseListings.filter((listing) => {
     if (state.filters.city && listing.city !== state.filters.city) return false;
     if (state.filters.type && listing.type !== state.filters.type) return false;
     if (state.filters.maxPrice && listing.priceValue > Number(state.filters.maxPrice)) return false;
@@ -327,7 +395,8 @@ function renderListings() {
     return true;
   });
 
-  grid.innerHTML = filteredListings.map((listing) => `
+  const visibleListings = filteredListings.slice(0, 3);
+  grid.innerHTML = visibleListings.map((listing) => `
     <article class="listing-card ${listing.id === state.selectedListing.id ? "active" : ""}" data-listing="${listing.id}">
       <div class="listing-image" style="background-image: ${listing.image}">
         <span>${listing.status}</span>
@@ -441,6 +510,7 @@ function bindUi() {
     toggleAutoTour();
   });
   document.querySelector("#loginButton").addEventListener("click", () => openAuthDialog("login"));
+  document.querySelector("#signupButton").addEventListener("click", () => openAuthDialog("signup"));
   document.querySelector("#postListingButton").addEventListener("click", () => {
     document.querySelector("#creatorDashboard").hidden = false;
     document.querySelector("#creatorDashboard").scrollIntoView({ behavior: "smooth" });
@@ -527,6 +597,7 @@ function updateAuthUi() {
   document.querySelector("#accountLabel").textContent = loggedIn ? state.user.name : "";
   document.querySelector("#postListingButton").hidden = !loggedIn;
   document.querySelector("#loginButton").hidden = loggedIn;
+  document.querySelector("#signupButton").hidden = loggedIn;
   document.querySelector("#logoutButton").hidden = !loggedIn;
   document.querySelector("#uploadLock").hidden = loggedIn;
   document.querySelector("#memberTools").hidden = !loggedIn;
@@ -554,8 +625,13 @@ function bindAuthDialog() {
     const payload = {
       email: document.querySelector("#authEmail").value,
       phone: document.querySelector("#authPhone").value,
+      termsAccepted: document.querySelector("#termsAccepted").checked,
       password: document.querySelector("#authPassword").value
     };
+    if (mode === "signup" && !payload.termsAccepted) {
+      message.textContent = "Potvrdite politiku korišćenja da nastavite.";
+      return;
+    }
     try {
       const data = await fetchJson(`/api/auth/${mode}`, {
         method: "POST",
@@ -578,6 +654,7 @@ function bindAuthDialog() {
     mode = nextMode;
     document.querySelector("#authTitle").textContent = mode === "signup" ? "Signup" : "Login";
     document.querySelector("#nameField").hidden = mode !== "signup";
+    document.querySelector("#termsField").hidden = mode !== "signup";
     document.querySelector("#authPassword").autocomplete = mode === "signup" ? "new-password" : "current-password";
     document.querySelectorAll("[data-auth-mode]").forEach((button) => button.classList.toggle("active", button.dataset.authMode === mode));
     message.textContent = "";
@@ -623,6 +700,8 @@ function renderAdminDashboard(stats) {
     ${adminMetric("Leadovi", stats.leads, "kontakt zahtevi", 88)}
     ${adminMetric("Upload danas", stats.uploadsToday, "nov materijal", 46)}
     ${adminMetric("Konverzija", `${stats.conversion}%`, "pregled u kontakt", 58)}
+    ${adminMetric("Live posetioci", stats.liveVisitors, "trenutno na sajtu", 52)}
+    ${adminMetric("Posetioci danas", stats.visitorsToday, "zabeležene sesije", 67)}
   `;
 }
 
@@ -637,7 +716,16 @@ async function logout() {
   await fetchJson("/api/auth/logout", { method: "POST" }).catch(() => {});
   state.user = null;
   updateAuthUi();
-  setUploadStatus("Odjavljeni ste");
+}
+
+function trackVisit() {
+  const visitorId = localStorage.getItem("stan360VisitorId") || crypto.randomUUID();
+  localStorage.setItem("stan360VisitorId", visitorId);
+  fetchJson("/api/analytics/visit", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ visitorId })
+  }).catch(() => {});
 }
 
 function bindFilters() {
@@ -692,11 +780,11 @@ function populateCityFilter() {
 }
 
 function handleInitialRoute() {
-  if (window.location.hash === "#master-admin") {
+  if (window.location.hash === "#admin") {
     document.querySelector("#adminDialog").showModal();
   }
   window.addEventListener("hashchange", () => {
-    if (window.location.hash === "#master-admin") {
+    if (window.location.hash === "#admin") {
       document.querySelector("#adminDialog").showModal();
     }
   });
@@ -1000,8 +1088,8 @@ async function toggleAutoTour() {
   while (state.autoTour) {
     for (const room of ["living", "kitchen", "bedroom", "bath", "hall"]) {
       if (!state.autoTour) break;
-      await walkToRoom(room, 1800);
-      await wait(450);
+      await walkToRoom(room, 4200);
+      await wait(900);
     }
   }
 }
@@ -1010,7 +1098,6 @@ async function walkToRoom(room, durationMs) {
   const target = ROOM_PATH[room] || ROOM_PATH.living;
   const start = state.camera.getPosition().clone();
   const startYaw = state.yaw;
-  const startPitch = state.pitch;
   const startTime = performance.now();
   return new Promise((resolve) => {
     const step = (now) => {
@@ -1022,7 +1109,6 @@ async function walkToRoom(room, durationMs) {
         start.z + (target[2] - start.z) * eased
       );
       state.yaw = startYaw + shortestAngle(startYaw, target[3]) * eased;
-      state.pitch = startPitch + (-6 - startPitch) * eased;
       if (progress < 1 && state.autoTour) requestAnimationFrame(step);
       else {
         document.querySelectorAll("[data-room]").forEach((button) => button.classList.toggle("active", button.dataset.room === room));

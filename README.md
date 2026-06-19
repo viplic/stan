@@ -1,4 +1,4 @@
-# RoomWalk
+# stan360
 
 Marketplace MVP for apartment and house listings with login-protected media upload and smooth 3D walkthrough previews.
 

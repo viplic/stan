@@ -7,10 +7,11 @@ export function normalizeEmail(email) {
   return String(email || "").trim().toLowerCase();
 }
 
-export function validateSignup({ email, password, phone }) {
+export function validateSignup({ email, password, phone, termsAccepted }) {
   const cleanEmail = normalizeEmail(email);
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) return "Unesite ispravan email.";
   if (String(phone || "").replace(/[^\d+]/g, "").length < 8) return "Unesite ispravan broj telefona.";
+  if (termsAccepted !== true) return "Potvrdite politiku korišćenja.";
   if (String(password || "").length < MIN_PASSWORD_LENGTH) return "Lozinka mora imati minimum 8 karaktera.";
   return null;
 }

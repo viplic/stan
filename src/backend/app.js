@@ -19,9 +19,11 @@ import {
   createUser,
   findUserByEmail,
   findUserById,
+  getAnalyticsStats,
   initStore,
   listUploads,
   publicUser,
+  recordVisit,
   verifyUserEmail
 } from "./store.js";
 
@@ -43,12 +45,18 @@ export function createApiApp() {
     response.json({ ok: true });
   });
 
+  app.post("/api/analytics/visit", (request, response) => {
+    const visitorId = String(request.body?.visitorId || crypto.randomBytes(8).toString("hex")).slice(0, 80);
+    recordVisit(visitorId).catch((error) => console.error("analytics visit failed", error));
+    response.json({ ok: true });
+  });
+
   app.get("/api/auth/verify", async (request, response) => {
     const user = await verifyUserEmail(String(request.query.token || ""));
     if (!user) return response.status(400).send("Verifikacioni link nije ispravan ili je istekao.");
     const token = createSessionToken(user.id);
     response.setHeader("Set-Cookie", sessionCookie(token, request));
-    response.redirect("/#upload");
+    response.redirect("/#postavi-oglas");
   });
 
   app.get("/api/auth/me", async (request, response) => {
@@ -97,11 +105,12 @@ export function createApiApp() {
   app.post("/api/admin/login", async (request, response) => {
     const email = String(request.body?.email || "").trim().toLowerCase();
     const password = String(request.body?.password || "");
-    const adminEmail = String(process.env.ADMIN_EMAIL || "admin@roomwalk.local").trim().toLowerCase();
+    const adminEmail = String(process.env.ADMIN_EMAIL || "admin@stan360.local").trim().toLowerCase();
     const adminPassword = String(process.env.ADMIN_PASSWORD || "admin12345");
     if (email !== adminEmail || password !== adminPassword) {
       return response.status(401).json({ error: "invalid_admin", message: "Admin pristup nije ispravan." });
     }
+    const analytics = await getAnalyticsStats();
     response.json({
       stats: {
         listings: 128,
@@ -109,7 +118,9 @@ export function createApiApp() {
         tours: 84,
         leads: 219,
         uploadsToday: 12,
-        conversion: 18
+        conversion: 18,
+        visitorsToday: analytics.visitorsToday,
+        liveVisitors: analytics.liveVisitors
       }
     });
   });
@@ -199,11 +210,11 @@ async function sendVerificationEmail(request, user) {
       body: JSON.stringify({
         from: process.env.EMAIL_FROM,
         to: user.email,
-        subject: "Verifikacija RoomWalk naloga",
-        html: `<p>Potvrdite email da biste koristili RoomWalk.</p><p><a href="${link}">Verifikuj email</a></p>`
+        subject: "Verifikacija stan360 naloga",
+        html: `<p>Potvrdite email da biste koristili stan360.</p><p><a href="${link}">Verifikuj email</a></p>`
       })
     });
     return;
   }
-  console.log(`RoomWalk verification link for ${user.email}: ${link}`);
+  console.log(`stan360 verification link for ${user.email}: ${link}`);
 }

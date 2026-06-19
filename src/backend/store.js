@@ -38,13 +38,20 @@ export async function initStore() {
         created_at timestamptz not null default now()
       )
     `;
+    await postgresSql`
+      create table if not exists analytics_visits (
+        visitor_id text primary key,
+        visit_day text not null,
+        last_seen timestamptz not null default now()
+      )
+    `;
   } else {
     await fs.mkdir(DATA_DIR, { recursive: true });
     await fs.mkdir(path.join(DATA_DIR, "uploads"), { recursive: true });
     try {
       await fs.access(DB_FILE);
     } catch {
-      await writeJson({ users: [], uploads: [], leads: [] });
+      await writeJson({ users: [], uploads: [], leads: [], visits: [] });
     }
   }
   initialized = true;
@@ -168,6 +175,51 @@ export async function listUploads(userId) {
   }
   const db = await readJson();
   return db.uploads.filter((upload) => upload.userId === userId).slice(-30).reverse();
+}
+
+export async function recordVisit(visitorId) {
+  await initStore();
+  const cleanId = String(visitorId || "").slice(0, 80);
+  const visitDay = new Date().toISOString().slice(0, 10);
+  if (postgresSql) {
+    await postgresSql`
+      insert into analytics_visits (visitor_id, visit_day, last_seen)
+      values (${cleanId}, ${visitDay}, now())
+      on conflict (visitor_id)
+      do update set visit_day = ${visitDay}, last_seen = now()
+    `;
+    return;
+  }
+  const db = await readJson();
+  db.visits ||= [];
+  const existing = db.visits.find((visit) => visit.visitorId === cleanId);
+  if (existing) {
+    existing.visitDay = visitDay;
+    existing.lastSeen = new Date().toISOString();
+  } else {
+    db.visits.push({ visitorId: cleanId, visitDay, lastSeen: new Date().toISOString() });
+  }
+  await writeJson(db);
+}
+
+export async function getAnalyticsStats() {
+  await initStore();
+  const visitDay = new Date().toISOString().slice(0, 10);
+  const liveCutoff = new Date(Date.now() - 1000 * 60 * 5).toISOString();
+  if (postgresSql) {
+    const today = await postgresSql`select count(*)::int as count from analytics_visits where visit_day = ${visitDay}`;
+    const live = await postgresSql`select count(*)::int as count from analytics_visits where last_seen > ${liveCutoff}`;
+    return {
+      visitorsToday: today[0]?.count || 0,
+      liveVisitors: live[0]?.count || 0
+    };
+  }
+  const db = await readJson();
+  db.visits ||= [];
+  return {
+    visitorsToday: db.visits.filter((visit) => visit.visitDay === visitDay).length,
+    liveVisitors: db.visits.filter((visit) => visit.lastSeen > liveCutoff).length
+  };
 }
 
 export function publicUser(user) {
