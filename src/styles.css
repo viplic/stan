@@ -1018,10 +1018,12 @@ h2 {
 
   main {
     width: min(100% - 20px, 1420px);
-    padding-top: 126px;
+    padding-top: 0;
   }
 
   .topbar {
+    position: relative;
+    inset: auto;
     height: auto;
     min-height: 112px;
     display: grid;
@@ -1084,9 +1086,9 @@ h2 {
   .hero-section {
     position: relative;
     width: 100vw;
-    min-height: calc(100svh - 126px);
+    min-height: auto;
     margin-left: calc(50% - 50vw);
-    padding: 36px 10px 22px;
+    padding: 34px 10px 24px;
     align-content: end;
     overflow: hidden;
     background:
@@ -1120,6 +1122,31 @@ h2 {
   .hero-search select,
   .hero-search button {
     min-height: 46px;
+  }
+
+  .metric-band {
+    gap: 10px;
+    margin: 14px 0 28px;
+  }
+
+  .metric-band article {
+    min-height: 104px;
+    display: grid;
+    align-content: start;
+    gap: 4px;
+    padding: 14px;
+  }
+
+  .metric-band strong {
+    font-size: 24px;
+    line-height: 1.08;
+  }
+
+  .metric-band span {
+    margin-top: 0;
+    font-size: 14px;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
   }
 
   .hero-actions,
