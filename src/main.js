@@ -80,6 +80,7 @@ document.querySelector("#app").innerHTML = `
     </nav>
     <div class="account-actions">
       <span id="accountLabel"></span>
+      <button class="ghost-button" id="postListingButton" hidden>Postavi oglas</button>
       <button class="ghost-button" id="loginButton">Login</button>
       <button class="ghost-button" id="logoutButton" hidden>Logout</button>
     </div>
@@ -91,11 +92,10 @@ document.querySelector("#app").innerHTML = `
         <p class="eyebrow">3D oglasi za stanove</p>
         <h1>Pogledaj oglase iz svoje sobe.</h1>
         <p>
-          Kao da si već tamo: prostorije, lokacija i kontakt sa stanodavcem sve u jednom mestu.
+          Kao da si već tamo: prostorije, lokacija i kontakt sa stanodavcem sve na jednom mestu.
         </p>
         <div class="hero-actions">
           <a class="primary-link" href="#listings">Pogledaj oglase</a>
-          <a class="secondary-link" href="#viewer">Otvori demo obilazak</a>
         </div>
       </div>
       <div class="hero-signal hero-search">
@@ -103,12 +103,6 @@ document.querySelector("#app").innerHTML = `
         <select id="cityFilter" aria-label="Grad"></select>
         <select id="priceFilter" aria-label="Cena">
           <option value="">Cena</option>
-          <option value="500">Do 500 EUR</option>
-          <option value="800">Do 800 EUR</option>
-          <option value="1000">Do 1.000 EUR</option>
-          <option value="1300">Do 1.300 EUR</option>
-          <option value="1700">Do 1.700 EUR</option>
-          <option value="2500">Do 2.500 EUR</option>
         </select>
         <select id="sizeFilter" aria-label="Kvadratura">
           <option value="">Kvadratura</option>
@@ -150,7 +144,7 @@ document.querySelector("#app").innerHTML = `
 
     <section class="listing-grid" id="listingGrid"></section>
 
-    <section class="product-grid">
+    <section class="product-grid creator-dashboard" id="creatorDashboard" hidden>
       <article id="upload" class="upload-panel">
         <div class="panel-heading">
           <p class="eyebrow">Upload pipeline</p>
@@ -189,7 +183,7 @@ document.querySelector("#app").innerHTML = `
           <small>Idealno: spor hod kroz sve prostorije ili više fotografija svake sobe.</small>
         </label>
         <div class="auth-lock" id="uploadLock">
-          <strong>Prijavi se da uploaduješ materijal</strong>
+          <strong>Prijavi se da ubaciš materijal</strong>
           <span>Nalog je potreban da bismo sačuvali tvoje oglase i obilaske.</span>
           <button class="primary-button" id="uploadLoginButton">Login / Signup</button>
         </div>
@@ -293,6 +287,25 @@ document.querySelector("#app").innerHTML = `
       <p class="form-message" id="authMessage"></p>
     </form>
   </dialog>
+
+  <dialog class="admin-dialog" id="adminDialog">
+    <form class="auth-card" id="adminForm" method="dialog">
+      <button class="dialog-close" type="button" id="adminCloseButton" aria-label="Zatvori">×</button>
+      <p class="eyebrow">Master admin</p>
+      <h2>Admin dashboard</h2>
+      <label>
+        Email
+        <input id="adminEmail" type="email" autocomplete="username" required />
+      </label>
+      <label>
+        Lozinka
+        <input id="adminPassword" type="password" autocomplete="current-password" required />
+      </label>
+      <button class="primary-button">Uđi u dashboard</button>
+      <p class="form-message" id="adminMessage"></p>
+      <div class="admin-dashboard" id="adminDashboard" hidden></div>
+    </form>
+  </dialog>
 `;
 
 await bootAccount();
@@ -302,6 +315,7 @@ renderPipeline();
 bindUi();
 populateCityFilter();
 prepareViewerLoading();
+handleInitialRoute();
 
 function renderListings() {
   const grid = document.querySelector("#listingGrid");
@@ -427,11 +441,16 @@ function bindUi() {
     toggleAutoTour();
   });
   document.querySelector("#loginButton").addEventListener("click", () => openAuthDialog("login"));
+  document.querySelector("#postListingButton").addEventListener("click", () => {
+    document.querySelector("#creatorDashboard").hidden = false;
+    document.querySelector("#creatorDashboard").scrollIntoView({ behavior: "smooth" });
+    window.location.hash = "postavi-oglas";
+  });
   document.querySelector("#uploadLoginButton").addEventListener("click", () => openAuthDialog("login"));
   document.querySelector("#logoutButton").addEventListener("click", logout);
   bindAuthDialog();
+  bindAdminDialog();
   bindFilters();
-  document.querySelector(".secondary-link[href='#viewer']").addEventListener("click", () => ensureViewer());
   document.querySelector("#startViewerButton").addEventListener("click", () => ensureViewer());
   document.querySelector("#shareButton").addEventListener("click", shareListing);
   document.querySelector("#scheduleButton").addEventListener("click", () => alert("Zahtev za gledanje je spreman za slanje stanodavcu."));
@@ -506,6 +525,7 @@ async function bootAccount() {
 function updateAuthUi() {
   const loggedIn = Boolean(state.user);
   document.querySelector("#accountLabel").textContent = loggedIn ? state.user.name : "";
+  document.querySelector("#postListingButton").hidden = !loggedIn;
   document.querySelector("#loginButton").hidden = loggedIn;
   document.querySelector("#logoutButton").hidden = !loggedIn;
   document.querySelector("#uploadLock").hidden = loggedIn;
@@ -542,7 +562,7 @@ function bindAuthDialog() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       });
-      state.user = data.user;
+      state.user = data.user || null;
       updateAuthUi();
       dialog.close();
       setUploadStatus(data.verificationRequired ? "Proverite email" : "Nalog je spreman");
@@ -567,6 +587,50 @@ function bindAuthDialog() {
     setMode(nextMode);
     dialog.showModal();
   };
+}
+
+function bindAdminDialog() {
+  const dialog = document.querySelector("#adminDialog");
+  const form = document.querySelector("#adminForm");
+  const message = document.querySelector("#adminMessage");
+  document.querySelector("#adminCloseButton").addEventListener("click", () => dialog.close());
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    message.textContent = "";
+    try {
+      const data = await fetchJson("/api/admin/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: document.querySelector("#adminEmail").value,
+          password: document.querySelector("#adminPassword").value
+        })
+      });
+      renderAdminDashboard(data.stats);
+    } catch (error) {
+      message.textContent = error.message || "Admin login nije uspeo.";
+    }
+  });
+}
+
+function renderAdminDashboard(stats) {
+  const dashboard = document.querySelector("#adminDashboard");
+  dashboard.hidden = false;
+  dashboard.innerHTML = `
+    ${adminMetric("Oglasi", stats.listings, "ukupno postavljeno", 82)}
+    ${adminMetric("Plaćeni oglasi", stats.paidListings, "aktivne promocije", 64)}
+    ${adminMetric("3D ture", stats.tours, "spremni walkthrough", 74)}
+    ${adminMetric("Leadovi", stats.leads, "kontakt zahtevi", 88)}
+    ${adminMetric("Upload danas", stats.uploadsToday, "nov materijal", 46)}
+    ${adminMetric("Konverzija", `${stats.conversion}%`, "pregled u kontakt", 58)}
+  `;
+}
+
+function adminMetric(label, value, hint, percent) {
+  return `<article class="admin-metric" style="--metric:${percent}%">
+    <div class="metric-circle"><strong>${value}</strong></div>
+    <div><h3>${label}</h3><span>${hint}</span></div>
+  </article>`;
 }
 
 async function logout() {
@@ -617,6 +681,25 @@ async function submitUpload() {
 function populateCityFilter() {
   const cityFilter = document.querySelector("#cityFilter");
   cityFilter.innerHTML = `<option value="">Svi gradovi</option>${SERBIAN_CITIES.map((city) => `<option value="${city}">${city}</option>`).join("")}`;
+  const priceFilter = document.querySelector("#priceFilter");
+  priceFilter.innerHTML = `<option value="">Cena</option>${Array.from({ length: 35 }, (_, index) => {
+    const value = (index + 1) * 100;
+    return `<option value="${value}">Do ${value.toLocaleString("sr-RS")} EUR</option>`;
+  }).join("")}`;
+  if (window.location.hash === "#postavi-oglas" && state.user) {
+    document.querySelector("#creatorDashboard").hidden = false;
+  }
+}
+
+function handleInitialRoute() {
+  if (window.location.hash === "#master-admin") {
+    document.querySelector("#adminDialog").showModal();
+  }
+  window.addEventListener("hashchange", () => {
+    if (window.location.hash === "#master-admin") {
+      document.querySelector("#adminDialog").showModal();
+    }
+  });
 }
 
 function setUploadStatus(text) {

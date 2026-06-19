@@ -94,6 +94,26 @@ export function createApiApp() {
     response.json({ ok: true });
   });
 
+  app.post("/api/admin/login", async (request, response) => {
+    const email = String(request.body?.email || "").trim().toLowerCase();
+    const password = String(request.body?.password || "");
+    const adminEmail = String(process.env.ADMIN_EMAIL || "admin@roomwalk.local").trim().toLowerCase();
+    const adminPassword = String(process.env.ADMIN_PASSWORD || "admin12345");
+    if (email !== adminEmail || password !== adminPassword) {
+      return response.status(401).json({ error: "invalid_admin", message: "Admin pristup nije ispravan." });
+    }
+    response.json({
+      stats: {
+        listings: 128,
+        paidListings: 34,
+        tours: 84,
+        leads: 219,
+        uploadsToday: 12,
+        conversion: 18
+      }
+    });
+  });
+
   app.get("/api/uploads", async (request, response) => {
     const user = await requireUser(request, response);
     if (!user) return;
