@@ -20,6 +20,7 @@ import {
   findUserByEmail,
   findUserById,
   getAnalyticsStats,
+  getListingStats,
   initStore,
   listPublicUploads,
   listUploads,
@@ -114,13 +115,14 @@ export function createApiApp() {
       return response.status(401).json({ error: "invalid_admin", message: "Admin pristup nije ispravan." });
     }
     const analytics = await getAnalyticsStats();
+    const listingStats = await getListingStats();
     response.json({
       stats: {
-        listings: 128,
+        listings: listingStats.activeListings,
         paidListings: 34,
-        tours: 84,
+        tours: listingStats.tours,
         leads: 219,
-        uploadsToday: 12,
+        uploadsToday: listingStats.uploadsToday,
         conversion: 18,
         visitorsToday: analytics.visitorsToday,
         liveVisitors: analytics.liveVisitors
@@ -137,6 +139,10 @@ export function createApiApp() {
   app.get("/api/public-listings", async (_request, response) => {
     const uploads = await listPublicUploads(12);
     response.json({ listings: uploads.map(publicUploadListing) });
+  });
+
+  app.get("/api/public-stats", async (_request, response) => {
+    response.json(await getListingStats());
   });
 
   app.post("/api/uploads", async (request, response) => {
@@ -173,7 +179,8 @@ export function createApiApp() {
           size: firstField(fields.size) || "",
           location: firstField(fields.location) || "",
           newBuild: firstField(fields.newBuild) === "true",
-          furnished: firstField(fields.furnished) === "true"
+          furnished: firstField(fields.furnished) === "true",
+          hasTour: firstField(fields.hasTour) !== "false"
         },
         files: incomingFiles.map((file) => ({
           name: file.originalFilename,
@@ -208,7 +215,7 @@ function publicUploadListing(upload) {
     floor: metadata.newBuild ? "Novogradnja" : "Oglas",
     city: location.split(",")[0]?.trim() || "",
     type: upload.listingType || "stan",
-    status: "Upload dodat",
+    status: metadata.hasTour === false ? "Oglas dodat" : "3D upload dodat",
     paid: false,
     quality: 72,
     thumbnail: upload.thumbnail || ""

@@ -182,9 +182,9 @@ document.querySelector("#app").innerHTML = `
     </section>
 
     <section class="metric-band market-stats page-view" data-page="home" aria-label="Pregled platforme">
-      <article><strong>128</strong><span>aktivni oglasi</span></article>
+      <article><strong id="activeListingsMetric">3</strong><span>aktivni oglasi</span></article>
       <article><strong>52</strong><span>gradovi u Srbiji</span></article>
-      <article><strong>84</strong><span>3D obilasci</span></article>
+      <article><strong id="tourListingsMetric">3</strong><span>3D obilasci</span></article>
       <article><strong>24/7</strong><span>pregled iz sobe</span></article>
     </section>
 
@@ -225,6 +225,7 @@ document.querySelector("#app").innerHTML = `
             <input id="listingLocation" placeholder="Grad, opština, ulica" />
           </label>
           <div class="checkbox-row">
+            <label><input id="hasTour" type="checkbox" checked /> 3D obilazak</label>
             <label><input id="newBuild" type="checkbox" /> Novogradnja</label>
             <label><input id="furnished" type="checkbox" /> Namešten</label>
           </div>
@@ -396,6 +397,7 @@ document.querySelector("#app").innerHTML = `
 await bootAccount();
 trackVisit();
 await loadPublicListings();
+await loadPublicStats();
 renderListings();
 renderListingDetail();
 renderPipeline();
@@ -778,6 +780,7 @@ async function submitUpload() {
   form.append("price", document.querySelector("#listingPrice").value);
   form.append("size", document.querySelector("#listingSize").value);
   form.append("location", document.querySelector("#listingLocation").value);
+  form.append("hasTour", document.querySelector("#hasTour").checked ? "true" : "false");
   form.append("newBuild", document.querySelector("#newBuild").checked ? "true" : "false");
   form.append("furnished", document.querySelector("#furnished").checked ? "true" : "false");
   state.files.forEach((file) => form.append("files", file));
@@ -786,7 +789,19 @@ async function submitUpload() {
     body: form
   });
   addUploadedListing(data.upload);
+  await loadPublicStats();
   return data;
+}
+
+async function loadPublicStats() {
+  try {
+    const stats = await fetchJson("/api/public-stats");
+    document.querySelector("#activeListingsMetric").textContent = stats.activeListings ?? 3;
+    document.querySelector("#tourListingsMetric").textContent = stats.tours ?? 3;
+  } catch {
+    document.querySelector("#activeListingsMetric").textContent = "3";
+    document.querySelector("#tourListingsMetric").textContent = "3";
+  }
 }
 
 async function loadPublicListings() {
@@ -825,7 +840,7 @@ function uploadToPublicListing(upload) {
     floor: metadata.newBuild ? "Novogradnja" : "Oglas",
     city: String(metadata.location || "").split(",")[0]?.trim(),
     type: upload?.listingType || "stan",
-    status: "Upload dodat",
+    status: metadata.hasTour === false ? "Oglas dodat" : "3D upload dodat",
     paid: false,
     quality: 72,
     thumbnail: upload?.thumbnail || ""

@@ -8,6 +8,7 @@ const DATA_DIR = path.resolve(process.cwd(), "data");
 const DB_FILE = process.env.ROOMWALK_DB_FILE || path.join(DATA_DIR, "roomwalk-db.json");
 let postgresSql = null;
 let initialized = false;
+const FEATURED_LISTINGS_COUNT = 3;
 
 export async function initStore() {
   if (initialized) return;
@@ -193,6 +194,19 @@ export async function listPublicUploads(limit = 12) {
   return [...db.uploads].slice(-limit).reverse();
 }
 
+export async function getListingStats() {
+  await initStore();
+  if (postgresSql) {
+    const rows = await postgresSql`
+      select id, user_id, title, listing_type, files, created_at
+      from uploads
+    `;
+    return buildListingStats(rows.map(mapUploadRow));
+  }
+  const db = await readJson();
+  return buildListingStats(db.uploads || []);
+}
+
 export async function recordVisit(visitorId) {
   await initStore();
   const cleanId = String(visitorId || "").slice(0, 80);
@@ -283,6 +297,25 @@ function mapUploadRow(row) {
     metadata: payload.metadata || {},
     thumbnail: payload.thumbnail || "",
     createdAt: row.created_at
+  };
+}
+
+function buildListingStats(uploads) {
+  const activeUploads = uploads.length;
+  const today = new Date().toISOString().slice(0, 10);
+  const tourUploads = uploads.filter((upload) => {
+    const payload = upload.files?.files ? upload.files : upload;
+    const files = payload.files || upload.files || [];
+    const metadata = payload.metadata || upload.metadata || {};
+    return metadata.hasTour !== false && files.length > 0;
+  }).length;
+  const uploadsToday = uploads.filter((upload) => String(upload.createdAt || upload.created_at || "").slice(0, 10) === today).length;
+  return {
+    activeListings: FEATURED_LISTINGS_COUNT + activeUploads,
+    tours: FEATURED_LISTINGS_COUNT + tourUploads,
+    uploadedListings: activeUploads,
+    uploadedTours: tourUploads,
+    uploadsToday
   };
 }
 
