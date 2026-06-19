@@ -188,14 +188,14 @@ document.querySelector("#app").innerHTML = `
       <article><strong>24/7</strong><span>pregled iz sobe</span></article>
     </section>
 
-    <section id="listings" class="section-heading page-view" data-page="search">
+    <section id="listings" class="section-heading page-view" data-page="home search">
       <div>
         <p class="eyebrow">Marketplace</p>
         <h2>Oglasi sa 3D obilaskom</h2>
       </div>
     </section>
 
-    <section class="listing-grid page-view" data-page="search" id="listingGrid"></section>
+    <section class="listing-grid page-view" data-page="home search" id="listingGrid"></section>
 
     <section class="product-grid creator-dashboard page-view" data-page="post" id="creatorDashboard" hidden>
       <article id="upload" class="upload-panel">
@@ -266,7 +266,7 @@ document.querySelector("#app").innerHTML = `
       </article>
     </section>
 
-    <section id="viewer" class="viewer-shell page-view" data-page="search">
+    <section id="viewer" class="viewer-shell page-view" data-page="home search">
       <div class="viewer-header">
         <div>
           <p class="eyebrow">Interactive walkthrough</p>
@@ -894,7 +894,7 @@ function currentRoute() {
 function renderRoute() {
   const route = currentRoute();
   document.querySelectorAll(".page-view").forEach((section) => {
-    section.hidden = section.dataset.page !== route;
+    section.hidden = !String(section.dataset.page || "").split(" ").includes(route);
   });
   if (route === "post" && !state.user) {
     openAuthDialog("login");
