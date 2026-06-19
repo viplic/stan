@@ -20,6 +20,21 @@ const ROOM_PATH = {
   hall: [0.25, 1.55, 2.25, 180]
 };
 
+const SAFE_PATHS = {
+  living: [[0.2, 1.55, -0.85, -12], ROOM_PATH.living],
+  kitchen: [[0.9, 1.55, -0.85, 12], ROOM_PATH.kitchen],
+  bedroom: [[0.2, 1.55, 0.35, 72], [-0.25, 1.55, 2.3, -120], ROOM_PATH.bedroom],
+  bath: [[0.2, 1.55, 0.35, 48], [2.35, 1.55, 2.25, 116], ROOM_PATH.bath],
+  hall: [[0.2, 1.55, 0.35, 150], ROOM_PATH.hall]
+};
+
+const WALL_BLOCKS = [
+  { minX: 1.55, maxX: 2.05, minZ: -3.85, maxZ: -1.4 },
+  { minX: 1.55, maxX: 2.05, minZ: 0.2, maxZ: 1.65 },
+  { minX: -3.95, maxX: -1.5, minZ: 1.0, maxZ: 1.5 },
+  { minX: -0.1, maxX: 0.35, minZ: 1.0, maxZ: 1.5 }
+];
+
 const listings = [
   {
     id: "vračar-01",
@@ -105,11 +120,12 @@ const state = {
 document.querySelector("#app").innerHTML = `
   <header class="topbar">
     <nav class="nav-links nav-left">
-      <a href="#listings">Oglasi</a>
-      <a href="#viewer">3D obilazak</a>
+      <a href="#/">Početna</a>
+      <a href="#/pretraga">Oglasi</a>
+      <a href="#/pretraga">3D obilazak</a>
     </nav>
-    <a class="brand" href="#listings" aria-label="stan360 početna">
-      <img src="/assets/stan360-logo.png" alt="stan360" />
+    <a class="brand" href="#/" aria-label="stan360 početna">
+      <img src="/assets/stan360-logo-transparent.png" alt="stan360" />
     </a>
     <div class="account-actions">
       <span id="accountLabel"></span>
@@ -121,7 +137,7 @@ document.querySelector("#app").innerHTML = `
   </header>
 
   <main>
-    <section class="hero-section">
+    <section class="hero-section page-view" data-page="home">
       <div class="hero-copy">
         <p class="eyebrow">3D oglasi za stanove</p>
         <h1>Pogledaj oglase iz svoje sobe.</h1>
@@ -129,7 +145,7 @@ document.querySelector("#app").innerHTML = `
           Kao da si već tamo: prostorije, lokacija i kontakt sa stanodavcem sve na jednom mestu.
         </p>
         <div class="hero-actions">
-          <a class="primary-link" href="#listings">Pogledaj oglase</a>
+          <a class="primary-link" href="#/pretraga">Pogledaj oglase</a>
         </div>
       </div>
       <div class="hero-signal hero-search">
@@ -155,30 +171,30 @@ document.querySelector("#app").innerHTML = `
       </div>
     </section>
 
-    <section class="metric-band" aria-label="Metrike platforme">
+    <section class="metric-band page-view" data-page="home" aria-label="Metrike platforme">
       <article><strong>3D</strong><span>walkthrough za svaki oglas</span></article>
       <article><strong>Auto tour</strong><span>sam biraš da te vodi kroz stan</span></article>
       <article><strong>Detalji</strong><span>tačke u prostoriji</span></article>
       <article><strong>Kontakt</strong><span>zakazivanje i poruke</span></article>
     </section>
 
-    <section class="metric-band market-stats" aria-label="Pregled platforme">
+    <section class="metric-band market-stats page-view" data-page="home" aria-label="Pregled platforme">
       <article><strong>128</strong><span>aktivni oglasi</span></article>
       <article><strong>52</strong><span>gradovi u Srbiji</span></article>
       <article><strong>84</strong><span>3D obilasci</span></article>
       <article><strong>24/7</strong><span>pregled iz sobe</span></article>
     </section>
 
-    <section id="listings" class="section-heading">
+    <section id="listings" class="section-heading page-view" data-page="search">
       <div>
         <p class="eyebrow">Marketplace</p>
         <h2>Oglasi sa 3D obilaskom</h2>
       </div>
     </section>
 
-    <section class="listing-grid" id="listingGrid"></section>
+    <section class="listing-grid page-view" data-page="search" id="listingGrid"></section>
 
-    <section class="product-grid creator-dashboard" id="creatorDashboard" hidden>
+    <section class="product-grid creator-dashboard page-view" data-page="post" id="creatorDashboard" hidden>
       <article id="upload" class="upload-panel">
         <div class="panel-heading">
           <p class="eyebrow">Upload pipeline</p>
@@ -247,7 +263,7 @@ document.querySelector("#app").innerHTML = `
       </article>
     </section>
 
-    <section id="viewer" class="viewer-shell">
+    <section id="viewer" class="viewer-shell page-view" data-page="search">
       <div class="viewer-header">
         <div>
           <p class="eyebrow">Interactive walkthrough</p>
@@ -297,7 +313,7 @@ document.querySelector("#app").innerHTML = `
   </main>
 
   <footer class="site-footer">
-    <div class="footer-logo"><img src="/assets/stan360-logo.png" alt="stan360" /></div>
+    <div class="footer-logo"><img src="/assets/stan360-logo-transparent.png" alt="stan360" /></div>
     <div class="footer-grid">
       <section>
         <h3>Korisno</h3>
@@ -383,6 +399,7 @@ bindUi();
 populateCityFilter();
 prepareViewerLoading();
 handleInitialRoute();
+renderRoute();
 
 function renderListings() {
   const grid = document.querySelector("#listingGrid");
@@ -512,9 +529,7 @@ function bindUi() {
   document.querySelector("#loginButton").addEventListener("click", () => openAuthDialog("login"));
   document.querySelector("#signupButton").addEventListener("click", () => openAuthDialog("signup"));
   document.querySelector("#postListingButton").addEventListener("click", () => {
-    document.querySelector("#creatorDashboard").hidden = false;
-    document.querySelector("#creatorDashboard").scrollIntoView({ behavior: "smooth" });
-    window.location.hash = "postavi-oglas";
+    window.location.hash = "#/postavi-oglas";
   });
   document.querySelector("#uploadLoginButton").addEventListener("click", () => openAuthDialog("login"));
   document.querySelector("#logoutButton").addEventListener("click", logout);
@@ -739,13 +754,11 @@ function bindFilters() {
     document.querySelector(selector).addEventListener("change", (event) => {
       state.filters[key] = event.target.value;
       renderListings();
-      window.location.hash = "pretraga";
     });
   });
   document.querySelector("#searchButton").addEventListener("click", () => {
     renderListings();
-    document.querySelector("#listings").scrollIntoView({ behavior: "smooth" });
-    window.location.hash = "pretraga";
+    window.location.hash = "#/pretraga";
   });
 }
 
@@ -774,20 +787,38 @@ function populateCityFilter() {
     const value = (index + 1) * 100;
     return `<option value="${value}">Do ${value.toLocaleString("sr-RS")} EUR</option>`;
   }).join("")}`;
-  if (window.location.hash === "#postavi-oglas" && state.user) {
-    document.querySelector("#creatorDashboard").hidden = false;
-  }
 }
 
 function handleInitialRoute() {
-  if (window.location.hash === "#admin") {
-    document.querySelector("#adminDialog").showModal();
-  }
   window.addEventListener("hashchange", () => {
+    renderRoute();
     if (window.location.hash === "#admin") {
       document.querySelector("#adminDialog").showModal();
     }
   });
+}
+
+function currentRoute() {
+  if (window.location.hash === "#/pretraga") return "search";
+  if (window.location.hash === "#/postavi-oglas") return "post";
+  return "home";
+}
+
+function renderRoute() {
+  const route = currentRoute();
+  document.querySelectorAll(".page-view").forEach((section) => {
+    section.hidden = section.dataset.page !== route;
+  });
+  if (route === "post" && !state.user) {
+    openAuthDialog("login");
+    window.location.hash = "#/";
+    return;
+  }
+  if (route === "search") renderListings();
+  if (window.location.hash === "#admin") {
+    document.querySelector("#adminDialog").showModal();
+  }
+  window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 function setUploadStatus(text) {
@@ -821,7 +852,7 @@ function prepareViewerLoading() {
   }, { rootMargin: "360px 0px" });
   observer.observe(viewer);
 
-  if (window.location.hash === "#viewer") {
+  if (window.location.hash === "#/pretraga") {
     ensureViewer();
   }
 }
@@ -914,8 +945,10 @@ function buildApartmentScene(app) {
   createBox(app, "front wall right", [3.8, 1.5, 4], [3.2, 3, 0.12], materials.wall);
   createBox(app, "left wall", [-5.5, 1.5, 0], [0.12, 3, 8], materials.wall);
   createBox(app, "right wall", [5.5, 1.5, 0], [0.12, 3, 8], materials.wall);
-  createBox(app, "kitchen divider", [1.8, 1.45, -1.1], [0.12, 2.9, 5.4], materials.wall);
-  createBox(app, "bedroom divider", [-1.8, 1.45, 1.25], [4.2, 2.9, 0.12], materials.wall);
+  createBox(app, "kitchen divider back", [1.8, 1.45, -2.6], [0.12, 2.9, 2.4], materials.wall);
+  createBox(app, "kitchen divider front", [1.8, 1.45, 0.9], [0.12, 2.9, 1.4], materials.wall);
+  createBox(app, "bedroom divider left", [-2.7, 1.45, 1.25], [2.4, 2.9, 0.12], materials.wall);
+  createBox(app, "bedroom divider right", [0.12, 1.45, 1.25], [0.42, 2.9, 0.12], materials.wall);
 
   createBox(app, "sofa", [-3.25, 0.42, -2.55], [2.35, 0.7, 0.86], materials.dark);
   createBox(app, "rug", [-2.1, 0.02, -1.35], [2.9, 0.04, 1.7], materials.rug);
@@ -1061,7 +1094,7 @@ function updateWalk(dt) {
     pos.x = clamp(pos.x, -4.85, 4.85);
     pos.z = clamp(pos.z, -3.45, 3.45);
     pos.y = 1.55;
-    state.camera.setPosition(pos);
+    if (!collidesWithWall(pos)) state.camera.setPosition(pos);
   }
 
   state.camera.setEulerAngles(state.pitch, state.yaw, 0);
@@ -1088,14 +1121,23 @@ async function toggleAutoTour() {
   while (state.autoTour) {
     for (const room of ["living", "kitchen", "bedroom", "bath", "hall"]) {
       if (!state.autoTour) break;
-      await walkToRoom(room, 4200);
-      await wait(900);
+      await walkToRoom(room, 6800);
+      await wait(1200);
     }
   }
 }
 
 async function walkToRoom(room, durationMs) {
-  const target = ROOM_PATH[room] || ROOM_PATH.living;
+  const waypoints = SAFE_PATHS[room] || SAFE_PATHS.living;
+  const segmentDuration = Math.max(1800, durationMs / waypoints.length);
+  for (const target of waypoints) {
+    if (!state.autoTour) break;
+    await walkSegment(target, segmentDuration);
+  }
+  document.querySelectorAll("[data-room]").forEach((button) => button.classList.toggle("active", button.dataset.room === room));
+}
+
+async function walkSegment(target, durationMs) {
   const start = state.camera.getPosition().clone();
   const startYaw = state.yaw;
   const startTime = performance.now();
@@ -1103,17 +1145,15 @@ async function walkToRoom(room, durationMs) {
     const step = (now) => {
       const progress = clamp((now - startTime) / durationMs, 0, 1);
       const eased = progress < 0.5 ? 2 * progress * progress : 1 - Math.pow(-2 * progress + 2, 2) / 2;
-      state.camera.setPosition(
+      const nextPosition = new pc.Vec3(
         start.x + (target[0] - start.x) * eased,
         1.55,
         start.z + (target[2] - start.z) * eased
       );
+      if (!collidesWithWall(nextPosition)) state.camera.setPosition(nextPosition);
       state.yaw = startYaw + shortestAngle(startYaw, target[3]) * eased;
       if (progress < 1 && state.autoTour) requestAnimationFrame(step);
-      else {
-        document.querySelectorAll("[data-room]").forEach((button) => button.classList.toggle("active", button.dataset.room === room));
-        resolve();
-      }
+      else resolve();
     };
     requestAnimationFrame(step);
   });
@@ -1121,6 +1161,16 @@ async function walkToRoom(room, durationMs) {
 
 function shortestAngle(from, to) {
   return ((((to - from) % 360) + 540) % 360) - 180;
+}
+
+function collidesWithWall(position) {
+  const radius = 0.22;
+  return WALL_BLOCKS.some((wall) =>
+    position.x > wall.minX - radius &&
+    position.x < wall.maxX + radius &&
+    position.z > wall.minZ - radius &&
+    position.z < wall.maxZ + radius
+  );
 }
 
 function applyUploadedTextures() {

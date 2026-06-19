@@ -56,7 +56,7 @@ export function createApiApp() {
     if (!user) return response.status(400).send("Verifikacioni link nije ispravan ili je istekao.");
     const token = createSessionToken(user.id);
     response.setHeader("Set-Cookie", sessionCookie(token, request));
-    response.redirect("/#postavi-oglas");
+    response.redirect("/#/postavi-oglas");
   });
 
   app.get("/api/auth/me", async (request, response) => {
