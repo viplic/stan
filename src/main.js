@@ -408,6 +408,7 @@ renderRoute();
 function renderListings() {
   const grid = document.querySelector("#listingGrid");
   const baseListings = [...listings];
+  const filtersActive = Boolean(state.filters.city || state.filters.type || state.filters.maxPrice || state.filters.minSize);
   const filteredListings = baseListings.filter((listing) => {
     if (state.filters.city && listing.city !== state.filters.city) return false;
     if (state.filters.type && listing.type !== state.filters.type) return false;
@@ -416,7 +417,10 @@ function renderListings() {
     return true;
   });
 
-  const visibleListings = filteredListings.slice(0, 3);
+  const visibleListings = filtersActive ? filteredListings : [
+    ...fallbackListings.slice(0, 3),
+    ...baseListings.filter((listing) => !fallbackListings.some((featured) => featured.id === listing.id))
+  ];
   grid.innerHTML = visibleListings.map((listing) => `
     <article class="listing-card ${listing.id === state.selectedListing.id ? "active" : ""}" data-listing="${listing.id}">
       <div class="listing-image" style="background-image: ${listing.image}">
@@ -789,7 +793,7 @@ async function loadPublicListings() {
   try {
     const data = await fetchJson("/api/public-listings");
     const uploadedListings = (data.listings || []).map(normalizeUploadedListing);
-    listings = mergeListings(uploadedListings, fallbackListings);
+    listings = mergeListings(fallbackListings, uploadedListings);
     state.selectedListing = listings.find((listing) => listing.id === state.selectedListing?.id) || listings[0];
     document.querySelector("#viewerTitle").textContent = state.selectedListing.title;
   } catch {
@@ -800,7 +804,7 @@ async function loadPublicListings() {
 
 function addUploadedListing(upload) {
   const listing = normalizeUploadedListing(uploadToPublicListing(upload));
-  listings = mergeListings([listing], listings);
+  listings = mergeListings(fallbackListings, [listing], listings);
   state.selectedListing = listing;
   document.querySelector("#viewerTitle").textContent = listing.title;
   renderListings();
@@ -849,9 +853,9 @@ function normalizeUploadedListing(listing) {
   };
 }
 
-function mergeListings(primary, secondary) {
+function mergeListings(...groups) {
   const seen = new Set();
-  return [...primary, ...secondary].filter((listing) => {
+  return groups.flat().filter((listing) => {
     if (!listing?.id || seen.has(listing.id)) return false;
     seen.add(listing.id);
     return true;
