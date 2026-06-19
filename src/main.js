@@ -114,7 +114,8 @@ const state = {
   keys: new Set(),
   touchMove: { x: 0, y: 0 },
   turnInput: 0,
-  uploadedTextureUrls: []
+  uploadedTextureUrls: [],
+  splatEntity: null
 };
 
 let listings = [...fallbackListings];
@@ -241,6 +242,9 @@ document.querySelector("#app").innerHTML = `
             <li>Pređi pragove polako: hodnik ka sobi, soba ka kupatilu, kuhinja ka dnevnoj. Zadrži kameru 2-3 sekunde na ulazu.</li>
             <li>Izbegni ljude, kućne ljubimce, ogledala izbliza, TV ekran i direktno sunce u kameru. Upali svetla u svim prostorijama.</li>
             <li>Za najbolji rezultat ubaci jedan neprekidan video cele putanje i dodatne fotografije detalja za svaku prostoriju.</li>
+            <li>Za real-time Gaussian Splat obradu treba minimum 80-120 oštrih fotografija ili 2-4 minuta stabilnog videa za ceo stan.</li>
+            <li>Materijal mora da pokrije iste površine iz više uglova, jer splat trening traži preklapanje kadrova i dovoljno kamera poza.</li>
+            <li>Finalni pipeline je: upload materijala, provera kvaliteta, generisanje kamera poza, trening .ply/.splat modela, optimizacija za web i objava walkthrough-a.</li>
           </ul>
         </div>
         <label class="dropzone" id="dropzone">
@@ -295,8 +299,8 @@ document.querySelector("#app").innerHTML = `
         <div class="canvas-wrap">
           <canvas id="walkCanvas"></canvas>
           <div class="viewer-loader" id="viewerLoader">
-            <strong>Pokreni lagani 3D obilazak</strong>
-            <span>Viewer se učitava tek sada, da lista oglasa ostane brza i na telefonu.</span>
+            <strong>Pokreni real-time Gaussian Splat walkthrough</strong>
+            <span>Demo koristi PlayCanvas GSplat renderer i volumetrijske splat tačke za prostorije, dok će uploadovani oglasi koristiti treniran .ply/.splat asset.</span>
             <button class="primary-button" id="startViewerButton">Uđi u stan</button>
           </div>
           <div class="viewer-hud">
@@ -1093,39 +1097,120 @@ function initPlayCanvas() {
 }
 
 function buildApartmentScene(app) {
-  const materials = {
-    wall: makeMaterial("warm white", [0.78, 0.80, 0.76]),
-    floor: makeMaterial("oak floor", [0.52, 0.39, 0.25]),
-    rug: makeMaterial("rug", [0.05, 0.42, 0.42]),
-    dark: makeMaterial("dark details", [0.09, 0.12, 0.14]),
-    accent: makeMaterial("accent", [0.86, 0.46, 0.18]),
-    glass: makeMaterial("glass", [0.35, 0.62, 0.70])
-  };
-
-  createBox(app, "floor", [0, -0.05, 0], [11, 0.1, 8], materials.floor);
-  createBox(app, "back wall", [0, 1.5, -4], [11, 3, 0.12], materials.wall);
-  createBox(app, "front wall left", [-3.7, 1.5, 4], [3.6, 3, 0.12], materials.wall);
-  createBox(app, "front wall right", [3.8, 1.5, 4], [3.2, 3, 0.12], materials.wall);
-  createBox(app, "left wall", [-5.5, 1.5, 0], [0.12, 3, 8], materials.wall);
-  createBox(app, "right wall", [5.5, 1.5, 0], [0.12, 3, 8], materials.wall);
-  createBox(app, "kitchen divider back", [1.8, 1.45, -2.6], [0.12, 2.9, 2.4], materials.wall);
-  createBox(app, "kitchen divider front", [1.8, 1.45, 0.9], [0.12, 2.9, 1.4], materials.wall);
-  createBox(app, "bedroom divider left", [-2.7, 1.45, 1.25], [2.4, 2.9, 0.12], materials.wall);
-  createBox(app, "bedroom divider right", [0.12, 1.45, 1.25], [0.42, 2.9, 0.12], materials.wall);
-
-  createBox(app, "sofa", [-3.25, 0.42, -2.55], [2.35, 0.7, 0.86], materials.dark);
-  createBox(app, "rug", [-2.1, 0.02, -1.35], [2.9, 0.04, 1.7], materials.rug);
-  createBox(app, "coffee table", [-2.1, 0.28, -1.25], [1.1, 0.18, 0.72], materials.accent);
-  createBox(app, "kitchen counter", [3.45, 0.52, -2.7], [2.6, 1.04, 0.62], materials.dark);
-  createBox(app, "kitchen island", [3.35, 0.48, 0.08], [1.65, 0.96, 0.78], materials.accent);
-  createBox(app, "bed", [-3.45, 0.48, 2.45], [2.25, 0.55, 1.55], materials.wall);
-  createBox(app, "wardrobe", [-5.0, 1.0, 2.2], [0.55, 2.0, 1.9], materials.dark);
-  createBox(app, "bath block", [3.9, 0.52, 2.55], [1.55, 1.04, 1.35], materials.glass);
-  createBox(app, "window", [0.15, 1.75, -4.07], [2.5, 1.1, 0.05], materials.glass);
-
+  createProceduralSplatApartment(app);
   createHotspot(app, [-2.1, 1.2, -1.35], "Dnevna soba");
   createHotspot(app, [3.35, 1.35, -0.05], "Kuhinja");
   createHotspot(app, [-3.45, 1.2, 2.45], "Spavaća soba");
+}
+
+function createProceduralSplatApartment(app) {
+  const data = buildApartmentGSplatData();
+  const resource = new pc.GSplatResource(app.graphicsDevice, data);
+  const entity = new pc.Entity("Real-time Gaussian splat apartment");
+  entity.addComponent("gsplat");
+  entity.gsplat.resource = resource;
+  entity.gsplat.customAabb = new pc.BoundingBox(new pc.Vec3(0, 1.4, 0), new pc.Vec3(6.2, 2.2, 4.7));
+  app.root.addChild(entity);
+  state.splatEntity = entity;
+  document.querySelector("#renderModeBadge").textContent = "Real-time GSplat";
+}
+
+function buildApartmentGSplatData() {
+  const points = [];
+  const wall = [0.78, 0.76, 0.69];
+  const floor = [0.50, 0.36, 0.22];
+  const ceiling = [0.70, 0.72, 0.68];
+  const dark = [0.10, 0.11, 0.12];
+  const wood = [0.63, 0.43, 0.24];
+  const fabric = [0.06, 0.34, 0.32];
+  const glass = [0.46, 0.68, 0.74];
+
+  addPlaneSplats(points, "floor", [-5.5, 0, -4], [5.5, 0, 4], "xz", 44, 32, floor, 0.055);
+  addPlaneSplats(points, "ceiling", [-5.5, 3, -4], [5.5, 3, 4], "xz", 30, 22, ceiling, 0.07);
+  addPlaneSplats(points, "back wall", [-5.5, 0, -4], [5.5, 3, -4], "xy", 42, 18, wall, 0.06);
+  addPlaneSplats(points, "front wall left", [-5.5, 0, 4], [-1.9, 3, 4], "xy", 18, 18, wall, 0.06);
+  addPlaneSplats(points, "front wall right", [2.2, 0, 4], [5.5, 3, 4], "xy", 18, 18, wall, 0.06);
+  addPlaneSplats(points, "left wall", [-5.5, 0, -4], [-5.5, 3, 4], "zy", 32, 18, wall, 0.06);
+  addPlaneSplats(points, "right wall", [5.5, 0, -4], [5.5, 3, 4], "zy", 32, 18, wall, 0.06);
+  addPlaneSplats(points, "kitchen divider back", [1.8, 0, -3.8], [1.8, 2.8, -1.4], "zy", 14, 16, wall, 0.055);
+  addPlaneSplats(points, "kitchen divider front", [1.8, 0, 0.2], [1.8, 2.8, 1.6], "zy", 9, 16, wall, 0.055);
+  addPlaneSplats(points, "bedroom divider left", [-4.0, 0, 1.25], [-1.5, 2.8, 1.25], "xy", 14, 16, wall, 0.055);
+  addPlaneSplats(points, "bedroom divider right", [-0.1, 0, 1.25], [0.35, 2.8, 1.25], "xy", 4, 16, wall, 0.055);
+  addBoxSplats(points, [-3.2, 0.42, -2.45], [2.2, 0.62, 0.85], dark, 0.07);
+  addBoxSplats(points, [-2.1, 0.06, -1.35], [2.8, 0.05, 1.65], fabric, 0.06);
+  addBoxSplats(points, [-2.1, 0.32, -1.25], [1.1, 0.22, 0.72], wood, 0.055);
+  addBoxSplats(points, [3.45, 0.55, -2.7], [2.55, 1.0, 0.58], dark, 0.06);
+  addBoxSplats(points, [3.35, 0.52, 0.08], [1.6, 0.9, 0.75], wood, 0.06);
+  addBoxSplats(points, [-3.45, 0.46, 2.45], [2.2, 0.52, 1.5], [0.76, 0.73, 0.67], 0.065);
+  addBoxSplats(points, [-5.0, 1.0, 2.2], [0.52, 1.9, 1.85], dark, 0.06);
+  addBoxSplats(points, [3.9, 0.55, 2.55], [1.5, 1.0, 1.3], glass, 0.065);
+  addPlaneSplats(points, "window", [-1.1, 1.3, -4.05], [1.3, 2.4, -4.05], "xy", 18, 8, glass, 0.05, 0.62);
+
+  return makeGSplatData(points);
+}
+
+function addPlaneSplats(points, _name, min, max, plane, countA, countB, color, size, alpha = 0.92) {
+  for (let a = 0; a < countA; a += 1) {
+    for (let b = 0; b < countB; b += 1) {
+      const u = countA === 1 ? 0.5 : a / (countA - 1);
+      const v = countB === 1 ? 0.5 : b / (countB - 1);
+      const jitter = () => (Math.random() - 0.5) * size * 0.9;
+      let x = min[0] + (max[0] - min[0]) * u;
+      let y = min[1] + (max[1] - min[1]) * v;
+      let z = min[2] + (max[2] - min[2]) * u;
+      if (plane === "xz") {
+        y = min[1];
+        z = min[2] + (max[2] - min[2]) * v;
+      }
+      if (plane === "zy") {
+        x = min[0];
+        z = min[2] + (max[2] - min[2]) * u;
+      }
+      points.push({ x: x + jitter(), y: y + jitter(), z: z + jitter(), color: variedColor(color), size, alpha });
+    }
+  }
+}
+
+function addBoxSplats(points, center, scale, color, size) {
+  const half = scale.map((value) => value / 2);
+  addPlaneSplats(points, "box top", [center[0] - half[0], center[1] + half[1], center[2] - half[2]], [center[0] + half[0], center[1] + half[1], center[2] + half[2]], "xz", 12, 8, color, size, 0.9);
+  addPlaneSplats(points, "box front", [center[0] - half[0], center[1] - half[1], center[2] + half[2]], [center[0] + half[0], center[1] + half[1], center[2] + half[2]], "xy", 12, 6, color, size, 0.9);
+  addPlaneSplats(points, "box side", [center[0] + half[0], center[1] - half[1], center[2] - half[2]], [center[0] + half[0], center[1] + half[1], center[2] + half[2]], "zy", 8, 6, color, size, 0.9);
+}
+
+function makeGSplatData(points) {
+  const count = points.length;
+  const props = ["x", "y", "z", "f_dc_0", "f_dc_1", "f_dc_2", "opacity", "scale_0", "scale_1", "scale_2", "rot_0", "rot_1", "rot_2", "rot_3"]
+    .map((name) => ({ type: "float", name, storage: new Float32Array(count), byteSize: 4 }));
+  const byName = Object.fromEntries(props.map((prop) => [prop.name, prop.storage]));
+  const SH_C0 = 0.28209479177387814;
+  points.forEach((point, index) => {
+    byName.x[index] = point.x;
+    byName.y[index] = point.y;
+    byName.z[index] = point.z;
+    byName.f_dc_0[index] = (point.color[0] - 0.5) / SH_C0;
+    byName.f_dc_1[index] = (point.color[1] - 0.5) / SH_C0;
+    byName.f_dc_2[index] = (point.color[2] - 0.5) / SH_C0;
+    byName.opacity[index] = logit(point.alpha);
+    byName.scale_0[index] = Math.log(point.size);
+    byName.scale_1[index] = Math.log(point.size * 0.7);
+    byName.scale_2[index] = Math.log(point.size * 0.7);
+    byName.rot_0[index] = 1;
+    byName.rot_1[index] = 0;
+    byName.rot_2[index] = 0;
+    byName.rot_3[index] = 0;
+  });
+  return new pc.GSplatData([{ name: "vertex", count, properties: props }], ["stan360 procedural real-time Gaussian splat demo"]);
+}
+
+function variedColor(color) {
+  const factor = 0.88 + Math.random() * 0.22;
+  return color.map((channel) => clamp(channel * factor, 0.02, 0.98));
+}
+
+function logit(value) {
+  const next = clamp(value, 0.001, 0.999);
+  return Math.log(next / (1 - next));
 }
 
 function createBox(app, name, position, scale, material) {
@@ -1337,21 +1422,8 @@ function collidesWithWall(position) {
 }
 
 function applyUploadedTextures() {
-  if (!state.uploadedTextureUrls.length || !state.app || !pc) return;
-  state.uploadedTextureUrls.forEach((url, index) => {
-    const img = new Image();
-    img.onload = () => {
-      const texture = new pc.Texture(state.app.graphicsDevice);
-      texture.setSource(img);
-      const material = new pc.StandardMaterial();
-      material.diffuseMap = texture;
-      material.roughness = 0.68;
-      material.update();
-      const x = -4.8 + index * 3.2;
-      createBox(state.app, `uploaded preview ${index}`, [x, 1.55, -3.92], [1.35, 0.9, 0.04], material);
-    };
-    img.src = url;
-  });
+  if (!state.uploadedTextureUrls.length) return;
+  document.querySelector("#renderModeBadge").textContent = "GSplat pipeline";
 }
 
 function resizeViewerCanvas() {

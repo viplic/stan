@@ -1198,15 +1198,19 @@ h2 {
   }
 
   .hero-signal {
-    padding: 14px;
+    gap: 18px;
+    padding: 18px;
     background: rgba(18, 24, 22, 0.9);
   }
 
   .hero-search select,
   .hero-search button {
-    min-height: 54px;
-    padding: 0 16px;
-    font-size: 16px;
+    min-height: 66px;
+    padding: 0 20px;
+    border-width: 2px;
+    font-size: 17px;
+    font-weight: 700;
+    touch-action: manipulation;
   }
 
   .listing-profile-hero {
