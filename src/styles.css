@@ -339,6 +339,11 @@ h2 {
   cursor: pointer;
 }
 
+.listing-card:hover {
+  transform: translateY(-2px);
+  transition: transform 160ms ease, border-color 160ms ease;
+}
+
 .listing-card.active {
   border-color: rgba(45, 212, 191, 0.75);
 }
@@ -397,6 +402,71 @@ h2 {
   width: var(--quality);
   height: 100%;
   background: linear-gradient(90deg, var(--accent), var(--accent-2));
+}
+
+.listing-profile {
+  margin: 24px 0;
+}
+
+.listing-profile-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(360px, 0.9fr);
+  gap: 18px;
+  align-items: stretch;
+}
+
+.listing-profile-image {
+  min-height: 430px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background-size: cover;
+  background-position: center;
+}
+
+.listing-profile-copy {
+  display: grid;
+  align-content: center;
+  gap: 16px;
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(18, 24, 22, 0.9);
+}
+
+.listing-profile-copy h2,
+.listing-profile-copy p {
+  margin: 0;
+}
+
+.listing-profile-copy p {
+  color: var(--muted);
+}
+
+.profile-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.profile-stats div {
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.profile-stats span,
+.profile-stats strong {
+  display: block;
+}
+
+.profile-stats span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.profile-stats strong {
+  margin-top: 4px;
 }
 
 .product-grid {
@@ -479,7 +549,8 @@ h2 {
 }
 
 .capture-guide,
-.listing-form {
+.listing-form,
+.capture-rules {
   margin-top: 14px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -492,9 +563,21 @@ h2 {
   padding: 16px;
 }
 
-.capture-guide span {
+.capture-guide span,
+.capture-rules li {
   color: var(--muted);
   line-height: 1.55;
+}
+
+.capture-rules {
+  padding: 16px;
+}
+
+.capture-rules ul {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0 0;
+  padding-left: 18px;
 }
 
 .listing-form {
@@ -1121,7 +1204,25 @@ h2 {
 
   .hero-search select,
   .hero-search button {
-    min-height: 46px;
+    min-height: 54px;
+    padding: 0 16px;
+    font-size: 16px;
+  }
+
+  .listing-profile-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .listing-profile-image {
+    min-height: 260px;
+  }
+
+  .listing-profile-copy {
+    padding: 16px;
+  }
+
+  .profile-stats {
+    grid-template-columns: 1fr;
   }
 
   .metric-band {

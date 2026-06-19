@@ -51,7 +51,7 @@ const fallbackListings = [
     status: "3D spreman",
     paid: true,
     quality: 92,
-    image: "linear-gradient(135deg, rgba(20, 184, 166, .92), rgba(14, 116, 144, .78)), url('https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1200&q=80')"
+    image: "url('https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1200&q=82')"
   },
   {
     id: "dorćol-02",
@@ -68,7 +68,7 @@ const fallbackListings = [
     status: "3D spreman",
     paid: true,
     quality: 88,
-    image: "linear-gradient(135deg, rgba(45, 212, 191, .82), rgba(15, 20, 18, .58)), url('https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80')"
+    image: "url('https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=82')"
   },
   {
     id: "novi-sad-03",
@@ -85,7 +85,7 @@ const fallbackListings = [
     status: "3D spreman",
     paid: true,
     quality: 84,
-    image: "linear-gradient(135deg, rgba(20, 184, 166, .76), rgba(27, 36, 33, .72)), url('https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?auto=format&fit=crop&w=1200&q=80')"
+    image: "url('https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?auto=format&fit=crop&w=1200&q=82')"
   }
 ];
 
@@ -197,6 +197,8 @@ document.querySelector("#app").innerHTML = `
 
     <section class="listing-grid page-view" data-page="home search" id="listingGrid"></section>
 
+    <section class="listing-profile page-view" data-page="detail" id="listingProfile"></section>
+
     <section class="product-grid creator-dashboard page-view" data-page="post" id="creatorDashboard" hidden>
       <article id="upload" class="upload-panel">
         <div class="panel-heading">
@@ -229,6 +231,17 @@ document.querySelector("#app").innerHTML = `
             <label><input id="newBuild" type="checkbox" /> Novogradnja</label>
             <label><input id="furnished" type="checkbox" /> Namešten</label>
           </div>
+        </div>
+        <div class="capture-rules" id="captureRules" hidden>
+          <strong>Pravila za dobar 3D walkthrough</strong>
+          <ul>
+            <li>Snimaj horizontalno, sporo i bez naglih okreta; stabilizacija telefona treba da bude uključena.</li>
+            <li>U svakoj prostoriji stani u centar, zatim snimi sva četiri ugla, plafon, pod, prozore i vrata.</li>
+            <li>Za sobe do 15 m2 dodaj 8-12 fotografija ili 20-30 sekundi sporog videa; za veće sobe dodaj još jedan krug iz suprotnog ugla.</li>
+            <li>Pređi pragove polako: hodnik ka sobi, soba ka kupatilu, kuhinja ka dnevnoj. Zadrži kameru 2-3 sekunde na ulazu.</li>
+            <li>Izbegni ljude, kućne ljubimce, ogledala izbliza, TV ekran i direktno sunce u kameru. Upali svetla u svim prostorijama.</li>
+            <li>Za najbolji rezultat ubaci jedan neprekidan video cele putanje i dodatne fotografije detalja za svaku prostoriju.</li>
+          </ul>
         </div>
         <label class="dropzone" id="dropzone">
           <input id="fileInput" type="file" accept="image/*,video/*" multiple />
@@ -267,7 +280,7 @@ document.querySelector("#app").innerHTML = `
       </article>
     </section>
 
-    <section id="viewer" class="viewer-shell page-view" data-page="home search">
+    <section id="viewer" class="viewer-shell page-view" data-page="home search detail">
       <div class="viewer-header">
         <div>
           <p class="eyebrow">Interactive walkthrough</p>
@@ -400,6 +413,7 @@ await loadPublicListings();
 await loadPublicStats();
 renderListings();
 renderListingDetail();
+renderListingProfile();
 renderPipeline();
 bindUi();
 populateCityFilter();
@@ -449,7 +463,9 @@ function renderListings() {
       document.querySelector("#viewerTitle").textContent = state.selectedListing.title;
       renderListings();
       renderListingDetail();
+      renderListingProfile();
       if (state.viewerReady) resetCamera();
+      window.location.hash = `#/oglas/${encodeURIComponent(state.selectedListing.id)}`;
     });
   });
 }
@@ -464,6 +480,35 @@ function renderListingDetail() {
       <div><dt>Sprat</dt><dd>${state.selectedListing.floor}</dd></div>
     </dl>
   `;
+}
+
+function renderListingProfile() {
+  const listing = state.selectedListing || listings[0];
+  document.querySelector("#listingProfile").innerHTML = `
+    <article class="listing-profile-hero">
+      <div class="listing-profile-image" style="background-image: ${listing.image}"></div>
+      <div class="listing-profile-copy">
+        <p class="eyebrow">Oglas</p>
+        <h2>${listing.title}</h2>
+        <p>${listing.location}</p>
+        <div class="profile-stats">
+          <div><span>Cena</span><strong>${listing.price}</strong></div>
+          <div><span>Kvadratura</span><strong>${listing.size}</strong></div>
+          <div><span>Tip</span><strong>${listing.type === "kuća" ? "Kuća" : "Stan"}</strong></div>
+          <div><span>Status</span><strong>${listing.status}</strong></div>
+        </div>
+        <div class="hero-actions">
+          <button class="primary-button" id="detailWalkButton">Otvori walkthrough</button>
+          <button class="secondary-button" id="detailContactButton">Kontaktiraj stanodavca</button>
+        </div>
+      </div>
+    </article>
+  `;
+  document.querySelector("#detailWalkButton")?.addEventListener("click", async () => {
+    await ensureViewer();
+    document.querySelector("#viewer").scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+  document.querySelector("#detailContactButton")?.addEventListener("click", () => alert("Kontakt forma će biti povezana sa profilom stanodavca."));
 }
 
 function bindUi() {
@@ -627,6 +672,7 @@ function updateAuthUi() {
   document.querySelector("#uploadLock").hidden = loggedIn;
   document.querySelector("#memberTools").hidden = !loggedIn;
   document.querySelector("#captureGuide").hidden = !loggedIn;
+  document.querySelector("#captureRules").hidden = !loggedIn;
   document.querySelector("#listingForm").hidden = !loggedIn;
   document.querySelector("#fileInput").disabled = !loggedIn;
   document.querySelector("#processButton").disabled = !loggedIn;
@@ -848,7 +894,7 @@ function uploadToPublicListing(upload) {
 }
 
 function normalizeUploadedListing(listing) {
-  const fallbackImage = "linear-gradient(135deg, rgba(45, 212, 191, .82), rgba(27, 36, 33, .78)), url('https://images.unsplash.com/photo-1600566752355-35792bedcfea?auto=format&fit=crop&w=1200&q=80')";
+  const fallbackImage = "url('https://images.unsplash.com/photo-1600566752355-35792bedcfea?auto=format&fit=crop&w=1200&q=82')";
   return {
     id: listing.id,
     title: listing.title || "Novi oglas",
@@ -903,11 +949,13 @@ function handleInitialRoute() {
 function currentRoute() {
   if (window.location.hash === "#/pretraga") return "search";
   if (window.location.hash === "#/postavi-oglas") return "post";
+  if (window.location.hash.startsWith("#/oglas/")) return "detail";
   return "home";
 }
 
 function renderRoute() {
   const route = currentRoute();
+  if (route === "detail") selectListingFromRoute();
   document.querySelectorAll(".page-view").forEach((section) => {
     section.hidden = !String(section.dataset.page || "").split(" ").includes(route);
   });
@@ -917,10 +965,23 @@ function renderRoute() {
     return;
   }
   if (route === "search") renderListings();
+  if (route === "detail") {
+    renderListingDetail();
+    renderListingProfile();
+    ensureViewer();
+  }
   if (window.location.hash === "#admin") {
     document.querySelector("#adminDialog").showModal();
   }
   window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function selectListingFromRoute() {
+  const id = decodeURIComponent(window.location.hash.replace("#/oglas/", ""));
+  const nextListing = listings.find((listing) => listing.id === id);
+  if (!nextListing) return;
+  state.selectedListing = nextListing;
+  document.querySelector("#viewerTitle").textContent = nextListing.title;
 }
 
 function setUploadStatus(text) {
