@@ -35,7 +35,7 @@ const WALL_BLOCKS = [
   { minX: -0.1, maxX: 0.35, minZ: 1.0, maxZ: 1.5 }
 ];
 
-const listings = [
+const fallbackListings = [
   {
     id: "vračar-01",
     title: "Svetao stan kod Hrama",
@@ -90,7 +90,7 @@ const listings = [
 ];
 
 const state = {
-  selectedListing: listings[0],
+  selectedListing: null,
   files: [],
   user: null,
   processing: false,
@@ -116,6 +116,9 @@ const state = {
   turnInput: 0,
   uploadedTextureUrls: []
 };
+
+let listings = [...fallbackListings];
+state.selectedListing = listings[0];
 
 document.querySelector("#app").innerHTML = `
   <header class="topbar">
@@ -392,6 +395,7 @@ document.querySelector("#app").innerHTML = `
 
 await bootAccount();
 trackVisit();
+await loadPublicListings();
 renderListings();
 renderListingDetail();
 renderPipeline();
@@ -403,7 +407,7 @@ renderRoute();
 
 function renderListings() {
   const grid = document.querySelector("#listingGrid");
-  const baseListings = [...listings].sort((a, b) => Number(b.paid) - Number(a.paid));
+  const baseListings = [...listings];
   const filteredListings = baseListings.filter((listing) => {
     if (state.filters.city && listing.city !== state.filters.city) return false;
     if (state.filters.type && listing.type !== state.filters.type) return false;
@@ -773,10 +777,89 @@ async function submitUpload() {
   form.append("newBuild", document.querySelector("#newBuild").checked ? "true" : "false");
   form.append("furnished", document.querySelector("#furnished").checked ? "true" : "false");
   state.files.forEach((file) => form.append("files", file));
-  return fetchJson("/api/uploads", {
+  const data = await fetchJson("/api/uploads", {
     method: "POST",
     body: form
   });
+  addUploadedListing(data.upload);
+  return data;
+}
+
+async function loadPublicListings() {
+  try {
+    const data = await fetchJson("/api/public-listings");
+    const uploadedListings = (data.listings || []).map(normalizeUploadedListing);
+    listings = mergeListings(uploadedListings, fallbackListings);
+    state.selectedListing = listings.find((listing) => listing.id === state.selectedListing?.id) || listings[0];
+    document.querySelector("#viewerTitle").textContent = state.selectedListing.title;
+  } catch {
+    listings = [...fallbackListings];
+    state.selectedListing = listings[0];
+  }
+}
+
+function addUploadedListing(upload) {
+  const listing = normalizeUploadedListing(uploadToPublicListing(upload));
+  listings = mergeListings([listing], listings);
+  state.selectedListing = listing;
+  document.querySelector("#viewerTitle").textContent = listing.title;
+  renderListings();
+  renderListingDetail();
+}
+
+function uploadToPublicListing(upload) {
+  const metadata = upload?.metadata || {};
+  return {
+    id: upload?.id,
+    title: upload?.title,
+    location: metadata.location,
+    price: metadata.price,
+    priceValue: parseFirstNumber(metadata.price),
+    size: metadata.size,
+    sizeValue: parseFirstNumber(metadata.size),
+    rooms: "3D",
+    floor: metadata.newBuild ? "Novogradnja" : "Oglas",
+    city: String(metadata.location || "").split(",")[0]?.trim(),
+    type: upload?.listingType || "stan",
+    status: "Upload dodat",
+    paid: false,
+    quality: 72,
+    thumbnail: upload?.thumbnail || ""
+  };
+}
+
+function normalizeUploadedListing(listing) {
+  const fallbackImage = "linear-gradient(135deg, rgba(45, 212, 191, .82), rgba(27, 36, 33, .78)), url('https://images.unsplash.com/photo-1600566752355-35792bedcfea?auto=format&fit=crop&w=1200&q=80')";
+  return {
+    id: listing.id,
+    title: listing.title || "Novi oglas",
+    location: listing.location || "Lokacija u pripremi",
+    price: listing.price || "Cena na upit",
+    priceValue: Number(listing.priceValue) || 0,
+    size: listing.size || "Kvadratura u pripremi",
+    sizeValue: Number(listing.sizeValue) || 0,
+    rooms: listing.rooms || "3D",
+    floor: listing.floor || "Oglas",
+    city: listing.city || "",
+    type: listing.type || "stan",
+    status: listing.status || "Upload dodat",
+    paid: Boolean(listing.paid),
+    quality: Number(listing.quality) || 72,
+    image: listing.thumbnail ? `url('${listing.thumbnail}')` : fallbackImage
+  };
+}
+
+function mergeListings(primary, secondary) {
+  const seen = new Set();
+  return [...primary, ...secondary].filter((listing) => {
+    if (!listing?.id || seen.has(listing.id)) return false;
+    seen.add(listing.id);
+    return true;
+  });
+}
+
+function parseFirstNumber(value) {
+  return Number(String(value || "").match(/\d+(?:[.,]\d+)?/)?.[0]?.replace(",", ".")) || 0;
 }
 
 function populateCityFilter() {

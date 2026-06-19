@@ -108,7 +108,7 @@ export async function createUser({ email, phone, passwordHash, verificationToken
   return user;
 }
 
-export async function createUpload({ userId, title, listingType, metadata, files }) {
+export async function createUpload({ userId, title, listingType, metadata, files, thumbnail }) {
   await initStore();
   const upload = {
     id: cryptoRandomId("upl"),
@@ -117,12 +117,13 @@ export async function createUpload({ userId, title, listingType, metadata, files
     listingType: String(listingType || "stan").trim().slice(0, 32),
     metadata: metadata || {},
     files,
+    thumbnail: thumbnail || "",
     createdAt: new Date().toISOString()
   };
   if (postgresSql) {
     await postgresSql`
       insert into uploads (id, user_id, title, listing_type, files, created_at)
-      values (${upload.id}, ${userId}, ${upload.title}, ${upload.listingType}, ${JSON.stringify({ files, metadata: upload.metadata })}, ${upload.createdAt})
+      values (${upload.id}, ${userId}, ${upload.title}, ${upload.listingType}, ${JSON.stringify({ files, metadata: upload.metadata, thumbnail: upload.thumbnail })}, ${upload.createdAt})
     `;
     return upload;
   }
@@ -175,6 +176,21 @@ export async function listUploads(userId) {
   }
   const db = await readJson();
   return db.uploads.filter((upload) => upload.userId === userId).slice(-30).reverse();
+}
+
+export async function listPublicUploads(limit = 12) {
+  await initStore();
+  if (postgresSql) {
+    const rows = await postgresSql`
+      select id, user_id, title, listing_type, files, created_at
+      from uploads
+      order by created_at desc
+      limit ${limit}
+    `;
+    return rows.map(mapUploadRow);
+  }
+  const db = await readJson();
+  return [...db.uploads].slice(-limit).reverse();
 }
 
 export async function recordVisit(visitorId) {
@@ -252,6 +268,20 @@ function mapUser(row) {
     passwordHash: row.password_hash,
     emailVerified: row.email_verified,
     verificationToken: row.verification_token,
+    createdAt: row.created_at
+  };
+}
+
+function mapUploadRow(row) {
+  const payload = row.files || {};
+  return {
+    id: row.id,
+    userId: row.user_id,
+    title: row.title,
+    listingType: row.listing_type,
+    files: payload.files || [],
+    metadata: payload.metadata || {},
+    thumbnail: payload.thumbnail || "",
     createdAt: row.created_at
   };
 }
