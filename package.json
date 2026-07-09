@@ -11,12 +11,22 @@
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
+    "@pascal-app/core": "^0.9.1",
+    "@pascal-app/editor": "^0.9.1",
+    "@pascal-app/viewer": "^0.9.1",
+    "@react-three/drei": "^10.7.7",
+    "@react-three/fiber": "^9.6.1",
+    "@vitejs/plugin-react": "^5.2.0",
     "express": "^5.2.1",
     "formidable": "^3.5.4",
     "playcanvas": "^2.19.1",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "three": "^0.184.0",
     "vite": "^7.1.0"
   },
   "overrides": {
-    "esbuild": "^0.28.1"
+    "esbuild": "^0.28.1",
+    "postcss": "^8.5.15"
   }
 }

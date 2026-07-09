@@ -37,3 +37,11 @@ Set these environment variables in Vercel:
 - `DATABASE_URL`
 
 Then deploy the repository. The frontend is built from `dist`, and `/api/*` routes go through the Express API handler.
+
+## Pascal Studio
+
+Open `http://localhost:5174/#/studio` to load the Pascal Editor island. The Pascal editor is lazy-loaded only for this route; the marketplace and existing PlayCanvas walkthrough remain vanilla/PlayCanvas code.
+
+The integration uses `@pascal-app/editor`, `@pascal-app/viewer`, and `@pascal-app/core` through the Vite React plugin. `next/link` and `next/image` are provided by small local compatibility shims so the Pascal package can run inside Vite without converting the application to Next.js.
+
+Pascal scene drafts are saved to localStorage under `stan360:pascal-scene:v1`. The Studio toolbar exports the current Pascal scene graph as JSON. If the browser cannot provide WebGL/WebGPU or the Pascal runtime fails, the route displays a clear message and mounts the existing vanilla editor fallback.

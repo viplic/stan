@@ -1,6 +1,7 @@
 import "./styles.css";
 import { createEditorStore } from "./editor/editorState.js";
 import { createEditorController } from "./editor/editorUi.js";
+import { mountPascalStudio } from "./pascal/mountPascalStudio.js";
 
 let pc;
 let openAuthDialog = () => {};
@@ -124,6 +125,7 @@ const state = {
 let listings = [...fallbackListings];
 state.selectedListing = listings[0];
 const editorStore = createEditorStore();
+let pascalStudioCleanup = null;
 
 document.querySelector("#app").innerHTML = `
   <header class="topbar">
@@ -203,7 +205,10 @@ document.querySelector("#app").innerHTML = `
 
     <section class="listing-grid page-view" data-page="home search" id="listingGrid"></section>
 
-    <section id="studioPage" class="page-view" data-page="editor" aria-label="stan360 apartment editor"></section>
+    <section id="studioPage" class="page-view" data-page="editor" aria-label="stan360 apartment editor">
+      <div id="pascalStudioMount"></div>
+      <div id="studioFallbackMount" hidden></div>
+    </section>
 
     <section class="listing-profile page-view" data-page="detail" id="listingProfile"></section>
 
@@ -422,11 +427,6 @@ await bootAccount();
 trackVisit();
 await loadPublicListings();
 await loadPublicStats();
-createEditorController({
-  root: document.querySelector("#studioPage"),
-  store: editorStore,
-  onPreview: previewEditorScene
-});
 renderListings();
 renderListingDetail();
 renderListingProfile();
@@ -845,6 +845,23 @@ function previewEditorScene(scene) {
   });
 }
 
+async function ensurePascalStudio() {
+  if (pascalStudioCleanup) return;
+  pascalStudioCleanup = await mountPascalStudio({
+    mountNode: document.querySelector("#pascalStudioMount"),
+    fallbackNode: document.querySelector("#studioFallbackMount"),
+    fallbackStore: editorStore,
+    onBack: () => { window.location.hash = "#/"; },
+    onPreview: previewEditorScene
+  });
+}
+
+function cleanupPascalStudio() {
+  if (!pascalStudioCleanup) return;
+  pascalStudioCleanup();
+  pascalStudioCleanup = null;
+}
+
 async function submitUpload() {
   const form = new FormData();
   form.append("title", document.querySelector("#listingLocation").value || state.selectedListing.title);
@@ -992,6 +1009,8 @@ function renderRoute() {
     window.location.hash = "#/";
     return;
   }
+  if (route === "editor") ensurePascalStudio();
+  else cleanupPascalStudio();
   if (route === "search") renderListings();
   if (route === "detail") {
     renderListingDetail();
