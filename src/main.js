@@ -1,4 +1,6 @@
 import "./styles.css";
+import { createEditorStore } from "./editor/editorState.js";
+import { createEditorController } from "./editor/editorUi.js";
 
 let pc;
 let openAuthDialog = () => {};
@@ -115,11 +117,13 @@ const state = {
   touchMove: { x: 0, y: 0 },
   turnInput: 0,
   uploadedTextureUrls: [],
-  splatEntity: null
+  splatEntity: null,
+  editorScene: null
 };
 
 let listings = [...fallbackListings];
 state.selectedListing = listings[0];
+const editorStore = createEditorStore();
 
 document.querySelector("#app").innerHTML = `
   <header class="topbar">
@@ -127,6 +131,7 @@ document.querySelector("#app").innerHTML = `
       <a href="#/">Početna</a>
       <a href="#/pretraga">Oglasi</a>
       <a href="#/pretraga">3D obilazak</a>
+      <a href="#/editor">Studio</a>
     </nav>
     <a class="brand" href="#/" aria-label="stan360 početna">
       <img src="/assets/stan360-logo-transparent.png" alt="stan360" />
@@ -197,6 +202,8 @@ document.querySelector("#app").innerHTML = `
     </section>
 
     <section class="listing-grid page-view" data-page="home search" id="listingGrid"></section>
+
+    <section id="studioPage" class="page-view" data-page="editor" aria-label="stan360 apartment editor"></section>
 
     <section class="listing-profile page-view" data-page="detail" id="listingProfile"></section>
 
@@ -415,6 +422,11 @@ await bootAccount();
 trackVisit();
 await loadPublicListings();
 await loadPublicStats();
+createEditorController({
+  root: document.querySelector("#studioPage"),
+  store: editorStore,
+  onPreview: previewEditorScene
+});
 renderListings();
 renderListingDetail();
 renderListingProfile();
@@ -822,6 +834,17 @@ function bindFilters() {
   });
 }
 
+function previewEditorScene(scene) {
+  state.editorScene = scene;
+  document.querySelector("#viewerTitle").textContent = `${scene.name} · preview walkthrough`;
+  document.querySelector("#renderModeBadge").textContent = "Editor preview";
+  window.location.hash = "#/";
+  requestAnimationFrame(() => {
+    document.querySelector("#viewer")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    ensureViewer();
+  });
+}
+
 async function submitUpload() {
   const form = new FormData();
   form.append("title", document.querySelector("#listingLocation").value || state.selectedListing.title);
@@ -952,6 +975,7 @@ function handleInitialRoute() {
 
 function currentRoute() {
   if (window.location.hash === "#/pretraga") return "search";
+  if (window.location.hash === "#/editor" || window.location.hash === "#/studio") return "editor";
   if (window.location.hash === "#/postavi-oglas") return "post";
   if (window.location.hash.startsWith("#/oglas/")) return "detail";
   return "home";
