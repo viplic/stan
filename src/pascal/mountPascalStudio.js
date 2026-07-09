@@ -1,6 +1,6 @@
 import { createEditorController } from "../editor/editorUi.js";
 
-export async function mountPascalStudio({ mountNode, fallbackNode, fallbackStore, onBack, onPreview }) {
+export async function mountPascalStudio({ mountNode, fallbackNode, fallbackStore, mode = "standalone", listingId = null, listingTitle = "", listingLocation = "", initialScene = null, onSave, onBack, onPreview }) {
   try {
     if (!("WebGLRenderingContext" in window) && !("gpu" in navigator)) {
       throw new Error("Ovaj browser nema WebGL ili WebGPU podršku.");
@@ -11,7 +11,7 @@ export async function mountPascalStudio({ mountNode, fallbackNode, fallbackStore
       import("./PascalStudio.jsx")
     ]);
     const root = createRoot(mountNode);
-    root.render(React.createElement(PascalStudio, { onBack, onPreview }));
+    root.render(React.createElement(PascalStudio, { mode, listingId, listingTitle, listingLocation, initialScene, onSave, onBack, onPreview }));
     fallbackNode.hidden = true;
     return () => {
       root.unmount();

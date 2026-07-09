@@ -2,8 +2,6 @@ import { Editor } from "@pascal-app/editor";
 import { useScene } from "@pascal-app/core";
 import React, { Component, useEffect, useMemo, useState } from "react";
 
-const STORAGE_KEY = "stan360:pascal-scene:v1";
-
 export class PascalStudioErrorBoundary extends Component {
   constructor(props) {
     super(props);
@@ -28,23 +26,26 @@ export class PascalStudioErrorBoundary extends Component {
   }
 }
 
-export default function PascalStudio({ onBack, onPreview }) {
+export default function PascalStudio({ mode = "standalone", listingId = null, listingTitle = "", listingLocation = "", initialScene = null, onSave, onBack, onPreview }) {
   const [graphics, setGraphics] = useState("checking");
   const [saveState, setSaveState] = useState("Draft spreman");
   const nodes = useScene((scene) => scene.nodes);
+  const storageKey = listingId ? `stan360:listing:${listingId}:pascalScene` : "stan360:pascal-scene:v1";
 
   useEffect(() => {
     setGraphics(typeof navigator !== "undefined" && "gpu" in navigator ? "webgpu" : "fallback");
   }, []);
 
   const saveScene = async (scene) => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(scene));
+    localStorage.setItem(storageKey, JSON.stringify(scene));
+    await onSave?.(scene);
     setSaveState("Sačuvano lokalno");
   };
 
   const loadScene = async () => {
     try {
-      const draft = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
+      if (initialScene?.nodes && initialScene?.rootNodeIds) return initialScene;
+      const draft = JSON.parse(localStorage.getItem(storageKey) || "null");
       return draft?.nodes && draft?.rootNodeIds ? draft : null;
     } catch {
       return null;
@@ -64,7 +65,7 @@ export default function PascalStudio({ onBack, onPreview }) {
 
   const toolbar = useMemo(() => (
     <div className="pascal-host-toolbar">
-      <span className="pascal-host-brand">stan360 <b>Studio</b></span>
+      <span className="pascal-host-brand">stan360 <b>{mode === "embedded" ? "3D editor oglasa" : "Studio"}</b>{listingTitle ? <small> · {listingTitle}{listingLocation ? ` · ${listingLocation}` : ""}</small> : null}</span>
       <span className={`pascal-graphics-status ${graphics}`}>{graphics === "webgpu" ? "WebGPU spreman" : graphics === "fallback" ? "WebGPU nije dostupan" : "Provera grafike…"}</span>
       <button className="pascal-host-button" onClick={exportScene}>Export JSON</button>
       <button className="pascal-host-button" onClick={() => onPreview({ nodes, rootNodeIds: useScene.getState().rootNodeIds })}>Preview</button>
@@ -80,7 +81,7 @@ export default function PascalStudio({ onBack, onPreview }) {
         <Editor
           layoutVersion="v2"
           navbarSlot={toolbar}
-          projectId="stan360-local-studio"
+          projectId={listingId || "stan360-local-studio"}
           onLoad={loadScene}
           onSave={saveScene}
           onDirty={() => setSaveState("Nes sačuvano")}

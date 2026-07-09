@@ -2,6 +2,15 @@ import "./styles.css";
 import { createEditorStore } from "./editor/editorState.js";
 import { createEditorController } from "./editor/editorUi.js";
 import { mountPascalStudio } from "./pascal/mountPascalStudio.js";
+import {
+  createListingDraftId,
+  listingSceneKey,
+  loadListingMetadata,
+  loadListingScene,
+  migrateListingDraft,
+  saveListingMetadata,
+  saveListingScene
+} from "./listings/listingDraft.js";
 
 let pc;
 let openAuthDialog = () => {};
@@ -52,6 +61,7 @@ const fallbackListings = [
     city: "Beograd",
     type: "stan",
     status: "3D spreman",
+    hasPascalScene: false,
     paid: true,
     quality: 92,
     image: "url('https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1200&q=82')"
@@ -69,6 +79,7 @@ const fallbackListings = [
     city: "Beograd",
     type: "stan",
     status: "3D spreman",
+    hasPascalScene: false,
     paid: true,
     quality: 88,
     image: "url('https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=82')"
@@ -86,6 +97,7 @@ const fallbackListings = [
     city: "Novi Sad",
     type: "stan",
     status: "3D spreman",
+    hasPascalScene: false,
     paid: true,
     quality: 84,
     image: "url('https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?auto=format&fit=crop&w=1200&q=82')"
@@ -119,7 +131,13 @@ const state = {
   turnInput: 0,
   uploadedTextureUrls: [],
   splatEntity: null,
-  editorScene: null
+  editorScene: null,
+  listingDraftId: null,
+  listingWizardStep: "details",
+  listingScene: null,
+  listingSceneSaved: false,
+  listingPascalCleanup: null,
+  listingEditorStore: null
 };
 
 let listings = [...fallbackListings];
@@ -219,11 +237,21 @@ document.querySelector("#app").innerHTML = `
           <h2>Dodaj materijal za novi 3D oglas</h2>
           <p>Upload i uputstvo se prikazuju tek nakon verifikovanog naloga.</p>
         </div>
-        <div class="capture-guide" id="captureGuide" hidden>
+        <div class="listing-wizard-stepper" id="listingWizardStepper" aria-label="Koraci za postavljanje oglasa">
+          <button type="button" data-wizard-go="details"><span>1</span>Detalji</button>
+          <button type="button" data-wizard-go="material"><span>2</span>Materijal</button>
+          <button type="button" data-wizard-go="editor"><span>3</span>3D editor</button>
+          <button type="button" data-wizard-go="preview"><span>4</span>Pregled</button>
+        </div>
+        <p class="listing-wizard-context" id="listingWizardContext">Napravi oglas i sačuvaj 3D raspored uz njega.</p>
+        <div class="capture-guide" id="captureGuide" data-wizard-content="material" hidden>
           <strong>Pre upload-a</strong>
           <span>Snimaj polako, uđi u svaku prostoriju, zadrži kameru 2-3 sekunde na centralnim delovima sobe i izbegni nagle pokrete.</span>
         </div>
-        <div class="listing-form" id="listingForm" hidden>
+        <div class="listing-form" id="listingForm" data-wizard-content="details" hidden>
+          <label>Naslov oglasa
+            <input id="listingTitle" placeholder="npr. Svetao stan kod Hrama" />
+          </label>
           <label>Tip oglasa
             <select id="listingPurpose">
               <option value="izdavanje">Izdavanje</option>
@@ -236,8 +264,17 @@ document.querySelector("#app").innerHTML = `
           <label>Kvadratura
             <input id="listingSize" inputmode="decimal" placeholder="npr. 64 m2" />
           </label>
+          <label>Broj soba
+            <input id="listingRooms" inputmode="decimal" placeholder="npr. 2.5" />
+          </label>
+          <label>Sprat
+            <input id="listingFloor" placeholder="npr. 4/6" />
+          </label>
           <label>Lokacija
             <input id="listingLocation" placeholder="Grad, opština, ulica" />
+          </label>
+          <label class="listing-description-field">Opis oglasa
+            <textarea id="listingDescription" placeholder="Opiši stan, raspored i najvažnije detalje."></textarea>
           </label>
           <div class="checkbox-row">
             <label><input id="hasTour" type="checkbox" checked /> 3D obilazak</label>
@@ -245,7 +282,11 @@ document.querySelector("#app").innerHTML = `
             <label><input id="furnished" type="checkbox" /> Namešten</label>
           </div>
         </div>
-        <div class="capture-rules" id="captureRules" hidden>
+        <div class="listing-wizard-actions" data-wizard-content="details">
+          <button class="secondary-button" type="button" id="saveListingDraftButton">Sačuvaj nacrt</button>
+          <button class="primary-button" type="button" id="listingDetailsNextButton">Nastavi na materijal</button>
+        </div>
+        <div class="capture-rules" id="captureRules" data-wizard-content="material" hidden>
           <strong>Pravila za dobar 3D walkthrough</strong>
           <ul>
             <li>Snimaj horizontalno, sporo i bez naglih okreta; stabilizacija telefona treba da bude uključena.</li>
@@ -259,29 +300,56 @@ document.querySelector("#app").innerHTML = `
             <li>Finalni pipeline je: upload materijala, provera kvaliteta, generisanje kamera poza, trening .ply/.splat modela, optimizacija za web i objava walkthrough-a.</li>
           </ul>
         </div>
-        <label class="dropzone" id="dropzone">
+        <label class="dropzone" id="dropzone" data-wizard-content="material">
           <input id="fileInput" type="file" accept="image/*,video/*" multiple />
           <span>+</span>
           <strong>Prevuci slike ili video ovde</strong>
           <small>Idealno: spor hod kroz sve prostorije ili više fotografija svake sobe.</small>
         </label>
-        <div class="auth-lock" id="uploadLock">
+        <div class="auth-lock" id="uploadLock" data-wizard-content="material">
           <strong>Prijavi se da ubaciš materijal</strong>
           <span>Nalog je potreban da bismo sačuvali tvoje oglase i obilaske.</span>
           <button class="primary-button" id="uploadLoginButton">Login / Signup</button>
         </div>
-        <div class="upload-summary">
+        <div class="upload-summary" data-wizard-content="material">
           <div><span>Fajlovi</span><strong id="fileCount">0</strong></div>
           <div><span>Tip oglasa</span><strong id="uploadTypeLabel">Stan</strong></div>
           <div><span>Status</span><strong id="uploadStatusLabel">Spremno</strong></div>
         </div>
-        <div class="mode-picker" role="group" aria-label="Kvalitet obrade">
+        <div class="mode-picker" data-wizard-content="material" role="group" aria-label="Kvalitet obrade">
           <button data-mode="preview">Brzi preview</button>
           <button class="active" data-mode="smart">Standard</button>
           <button data-mode="premium">Detaljno</button>
         </div>
-        <button class="primary-button" id="processButton">Sačuvaj i napravi preview</button>
-        <div class="pipeline" id="pipeline"></div>
+        <button class="primary-button" data-wizard-content="material" id="processButton">Sačuvaj materijal i nastavi na 3D editor</button>
+        <div class="pipeline" data-wizard-content="material" id="pipeline"></div>
+        <div class="listing-wizard-panel" data-wizard-content="editor" id="listingEditorStep" hidden>
+          <div class="listing-wizard-panel-heading">
+            <p class="eyebrow">Korak 3</p>
+            <h3>Napravi 3D raspored stana</h3>
+            <p>Dodaj zidove, sobe, vrata, prozore, nameštaj i hotspotove. Raspored se čuva uz ovaj oglas.</p>
+          </div>
+          <div class="listing-pascal-host">
+            <div id="listingPascalMount"></div>
+            <div id="listingPascalFallbackMount" hidden></div>
+          </div>
+          <div class="listing-wizard-actions">
+            <button class="secondary-button" type="button" id="listingEditorBackButton">Nazad na materijal</button>
+            <button class="primary-button" type="button" id="listingEditorNextButton">Nastavi na pregled</button>
+          </div>
+        </div>
+        <div class="listing-wizard-panel" data-wizard-content="preview" id="listingPreviewStep" hidden>
+          <div class="listing-wizard-panel-heading">
+            <p class="eyebrow">Korak 4</p>
+            <h3>Pregled oglasa pre objave</h3>
+            <p>Proveri detalje, materijal i 3D raspored pre nego što sačuvaš oglas.</p>
+          </div>
+          <div class="listing-preview-content" id="listingPreviewContent"></div>
+          <div class="listing-wizard-actions">
+            <button class="secondary-button" type="button" id="listingPreviewBackButton">Nazad na 3D editor</button>
+            <button class="primary-button" type="button" id="publishListingButton">Sačuvaj oglas</button>
+          </div>
+        </div>
       </article>
 
       <article class="strategy-panel" id="memberTools" hidden>
@@ -469,11 +537,16 @@ function renderListings() {
           <span>${listing.rooms} sobe</span>
         </div>
         <div class="quality-bar" style="--quality: ${listing.quality}%"><span></span></div>
+        <button class="listing-edit-3d" type="button" data-listing-edit="${listing.id}">${listing.hasPascalScene ? "Izmeni 3D" : "Dodaj 3D"}</button>
       </div>
     </article>
   `).join("") || `<div class="empty-state">Nema oglasa za izabrane filtere.</div>`;
 
   grid.querySelectorAll("[data-listing]").forEach((card) => {
+    card.querySelector("[data-listing-edit]")?.addEventListener("click", (event) => {
+      event.stopPropagation();
+      openListingEditor(card.dataset.listing);
+    });
     card.addEventListener("click", () => {
       state.selectedListing = listings.find((item) => item.id === card.dataset.listing) || listings[0];
       document.querySelector("#viewerTitle").textContent = state.selectedListing.title;
@@ -512,9 +585,11 @@ function renderListingProfile() {
           <div><span>Kvadratura</span><strong>${listing.size}</strong></div>
           <div><span>Tip</span><strong>${listing.type === "kuća" ? "Kuća" : "Stan"}</strong></div>
           <div><span>Status</span><strong>${listing.status}</strong></div>
+          <div><span>3D raspored</span><strong>${listing.hasPascalScene ? "Sačuvan" : "Nije dodat"}</strong></div>
         </div>
         <div class="hero-actions">
           <button class="primary-button" id="detailWalkButton">Otvori walkthrough</button>
+          <button class="secondary-button" id="detailEdit3dButton">${listing.hasPascalScene ? "Izmeni 3D" : "Dodaj 3D raspored"}</button>
           <button class="secondary-button" id="detailContactButton">Kontaktiraj stanodavca</button>
         </div>
       </div>
@@ -524,6 +599,7 @@ function renderListingProfile() {
     await ensureViewer();
     document.querySelector("#viewer").scrollIntoView({ behavior: "smooth", block: "start" });
   });
+  document.querySelector("#detailEdit3dButton")?.addEventListener("click", () => openListingEditor(listing.id));
   document.querySelector("#detailContactButton")?.addEventListener("click", () => alert("Kontakt forma će biti povezana sa profilom stanodavca."));
 }
 
@@ -568,20 +644,20 @@ function bindUi() {
       openAuthDialog("login");
       return;
     }
-    if (!state.files.length) {
-      setUploadStatus("Dodaj bar jednu sliku ili video.");
-      return;
-    }
     state.processing = true;
     state.processed = false;
     renderPipeline();
     try {
-      await submitUpload();
-      await wait(500);
+      saveListingDraftFromForm();
+      if (state.files.length) {
+        await submitUpload();
+        await wait(500);
+      } else {
+        setUploadStatus("Nastavljamo bez materijala; možete ga dodati kasnije.");
+      }
       state.processed = true;
-      setUploadStatus("Preview je spreman");
-      await ensureViewer();
-      applyUploadedTextures();
+      setUploadStatus("Materijal je sačuvan");
+      goToListingWizardStep("editor");
     } catch (error) {
       setUploadStatus(error.message || "Upload nije uspeo.");
     }
@@ -601,6 +677,21 @@ function bindUi() {
   document.querySelector("#signupButton").addEventListener("click", () => openAuthDialog("signup"));
   document.querySelector("#postListingButton").addEventListener("click", () => {
     window.location.hash = "#/postavi-oglas";
+  });
+  document.querySelector("#listingDetailsNextButton").addEventListener("click", () => {
+    if (!saveListingDraftFromForm(true)) return;
+    goToListingWizardStep("material");
+  });
+  document.querySelector("#saveListingDraftButton").addEventListener("click", () => {
+    saveListingDraftFromForm();
+    setUploadStatus("Nacrt oglasa je sačuvan");
+  });
+  document.querySelector("#listingEditorBackButton").addEventListener("click", () => goToListingWizardStep("material"));
+  document.querySelector("#listingEditorNextButton").addEventListener("click", () => goToListingWizardStep("preview"));
+  document.querySelector("#listingPreviewBackButton").addEventListener("click", () => goToListingWizardStep("editor"));
+  document.querySelector("#publishListingButton").addEventListener("click", publishListingDraft);
+  document.querySelectorAll("[data-wizard-go]").forEach((button) => {
+    button.addEventListener("click", () => goToListingWizardStep(button.dataset.wizardGo));
   });
   document.querySelector("#uploadLoginButton").addEventListener("click", () => openAuthDialog("login"));
   document.querySelector("#logoutButton").addEventListener("click", logout);
@@ -693,6 +784,7 @@ function updateAuthUi() {
   document.querySelector("#fileInput").disabled = !loggedIn;
   document.querySelector("#processButton").disabled = !loggedIn;
   document.querySelector("#dropzone").classList.toggle("locked", !loggedIn);
+  if (currentRoute() === "post") setWizardStep(state.listingWizardStep);
 }
 
 function bindAuthDialog() {
@@ -834,6 +926,131 @@ function bindFilters() {
   });
 }
 
+function getListingIdFromHash() {
+  const query = window.location.hash.split("?")[1] || "";
+  return new URLSearchParams(query).get("listingId");
+}
+
+function openListingEditor(listingId) {
+  window.location.hash = `#/postavi-oglas?listingId=${encodeURIComponent(listingId)}`;
+}
+
+function listingMetadataFromForm() {
+  return {
+    title: document.querySelector("#listingTitle").value.trim(),
+    purpose: document.querySelector("#listingPurpose").value,
+    price: document.querySelector("#listingPrice").value.trim(),
+    size: document.querySelector("#listingSize").value.trim(),
+    rooms: document.querySelector("#listingRooms").value.trim(),
+    floor: document.querySelector("#listingFloor").value.trim(),
+    location: document.querySelector("#listingLocation").value.trim(),
+    description: document.querySelector("#listingDescription").value.trim(),
+    hasTour: document.querySelector("#hasTour").checked,
+    newBuild: document.querySelector("#newBuild").checked,
+    furnished: document.querySelector("#furnished").checked,
+    contactEmail: state.user?.email || ""
+  };
+}
+
+function saveListingDraftFromForm(validate = false) {
+  if (!state.listingDraftId) state.listingDraftId = createListingDraftId();
+  const metadata = listingMetadataFromForm();
+  if (validate && (!metadata.title || !metadata.price || !metadata.size || !metadata.location)) {
+    setUploadStatus("Popunite naslov, cenu, kvadraturu i lokaciju.");
+    return false;
+  }
+  saveListingMetadata(state.listingDraftId, {
+    ...metadata,
+    sceneDraftKey: listingSceneKey(state.listingDraftId),
+    hasPascalScene: Boolean(state.listingScene)
+  });
+  return true;
+}
+
+function fillListingForm(listing, metadata = {}) {
+  const source = { ...listing, ...metadata };
+  document.querySelector("#listingTitle").value = source.title || "";
+  document.querySelector("#listingPurpose").value = source.purpose || "izdavanje";
+  document.querySelector("#listingPrice").value = source.price || "";
+  document.querySelector("#listingSize").value = source.size || "";
+  document.querySelector("#listingRooms").value = source.rooms === "3D" ? "" : source.rooms || "";
+  document.querySelector("#listingFloor").value = source.floor === "Oglas" ? "" : source.floor || "";
+  document.querySelector("#listingLocation").value = source.location || "";
+  document.querySelector("#listingDescription").value = source.description || "";
+  document.querySelector("#hasTour").checked = source.hasTour !== false;
+  document.querySelector("#newBuild").checked = Boolean(source.newBuild);
+  document.querySelector("#furnished").checked = Boolean(source.furnished);
+}
+
+function prepareListingWizard() {
+  const requestedId = getListingIdFromHash();
+  const nextId = requestedId || state.listingDraftId || createListingDraftId();
+  if (state.listingDraftId === nextId) {
+    setWizardStep(state.listingWizardStep);
+    return;
+  }
+  state.listingDraftId = nextId;
+  state.listingScene = loadListingScene(nextId);
+  state.listingSceneSaved = Boolean(state.listingScene);
+  state.listingEditorStore = createEditorStore({ storageKey: listingSceneKey(nextId) });
+  const listing = listings.find((item) => item.id === nextId);
+  fillListingForm(listing, loadListingMetadata(nextId) || {});
+  state.listingWizardStep = requestedId ? "details" : "details";
+  setWizardStep(state.listingWizardStep);
+}
+
+function goToListingWizardStep(step) {
+  if (step === "editor" && !state.listingDraftId) prepareListingWizard();
+  if (step !== "details") saveListingDraftFromForm();
+  setWizardStep(step);
+}
+
+function setWizardStep(step) {
+  const validSteps = ["details", "material", "editor", "preview"];
+  state.listingWizardStep = validSteps.includes(step) ? step : "details";
+  document.querySelectorAll("[data-wizard-content]").forEach((element) => {
+    element.hidden = element.dataset.wizardContent !== state.listingWizardStep;
+  });
+  document.querySelectorAll("[data-wizard-go]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.wizardGo === state.listingWizardStep);
+  });
+  const context = {
+    details: "Unesi osnovne podatke o nekretnini.",
+    material: "Dodaj fotografije ili video ako ih imaš; možeš nastaviti i bez njih.",
+    editor: "Pripremi 3D raspored koji se čuva uz ovaj oglas.",
+    preview: "Proveri sve pre nego što sačuvaš oglas."
+  }[state.listingWizardStep];
+  document.querySelector("#listingWizardContext").textContent = context;
+  if (state.listingWizardStep === "editor") ensureListingPascalStudio();
+  else cleanupListingPascalStudio();
+  if (state.listingWizardStep === "preview") renderListingPreview();
+}
+
+function renderListingPreview() {
+  const metadata = listingMetadataFromForm();
+  document.querySelector("#listingPreviewContent").innerHTML = `
+    <div class="listing-preview-card"><span>Naslov</span><strong>${escapeHtml(metadata.title || "Novi oglas")}</strong></div>
+    <div class="listing-preview-card"><span>Lokacija</span><strong>${escapeHtml(metadata.location || "Nije uneta")}</strong></div>
+    <div class="listing-preview-card"><span>Cena / kvadratura</span><strong>${escapeHtml(metadata.price || "Cena na upit")} · ${escapeHtml(metadata.size || "Kvadratura nije uneta")}</strong></div>
+    <div class="listing-preview-card"><span>Materijal</span><strong>${state.files.length ? `${state.files.length} fajlova spremno` : "Materijal nije dodat"}</strong></div>
+    <div class="listing-preview-card"><span>3D raspored</span><strong>${state.listingScene ? "Sačuvan uz ovaj oglas" : "Nije još sačuvan"}</strong></div>
+  `;
+  document.querySelector("#publishListingButton").textContent = state.listingDraftId?.startsWith("draft_") ? "Sačuvaj oglas kao nacrt" : "Sačuvaj oglas";
+}
+
+async function publishListingDraft() {
+  saveListingDraftFromForm();
+  if (state.listingDraftId?.startsWith("draft_")) {
+    setUploadStatus("Nacrt oglasa i 3D raspored su sačuvani.");
+    return;
+  }
+  const listing = listings.find((item) => item.id === state.listingDraftId);
+  if (listing) {
+    state.selectedListing = listing;
+    window.location.hash = `#/oglas/${encodeURIComponent(listing.id)}`;
+  }
+}
+
 function previewEditorScene(scene) {
   state.editorScene = scene;
   document.querySelector("#viewerTitle").textContent = `${scene.name} · preview walkthrough`;
@@ -847,13 +1064,91 @@ function previewEditorScene(scene) {
 
 async function ensurePascalStudio() {
   if (pascalStudioCleanup) return;
+  const listingId = getListingIdFromHash();
+  const listing = listingId ? listings.find((item) => item.id === listingId) : null;
+  const initialScene = listingId ? loadListingScene(listingId) : null;
   pascalStudioCleanup = await mountPascalStudio({
     mountNode: document.querySelector("#pascalStudioMount"),
     fallbackNode: document.querySelector("#studioFallbackMount"),
-    fallbackStore: editorStore,
+    fallbackStore: listingId ? createEditorStore({ storageKey: listingSceneKey(listingId) }) : editorStore,
+    mode: listingId ? "embedded" : "standalone",
+    listingId,
+    listingTitle: listing?.title || "",
+    listingLocation: listing?.location || "",
+    initialScene,
+    onSave: listingId ? (scene) => {
+      saveListingScene(listingId, scene);
+      return saveListingSceneForListingId(listingId, scene);
+    } : undefined,
     onBack: () => { window.location.hash = "#/"; },
     onPreview: previewEditorScene
   });
+}
+
+async function saveListingSceneForListingId(listingId, scene) {
+  if (listingId.startsWith("draft_")) return;
+  await fetchJson(`/api/uploads/${encodeURIComponent(listingId)}/scene`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ scene })
+  }).catch(() => {});
+}
+
+async function ensureListingPascalStudio() {
+  if (state.listingPascalCleanup || !state.listingDraftId) return;
+  const listingId = state.listingDraftId;
+  let initialScene = state.listingScene || loadListingScene(listingId);
+  if (!initialScene && !listingId.startsWith("draft_")) {
+    const remote = await fetchJson(`/api/uploads/${encodeURIComponent(listingId)}/scene`).catch(() => null);
+    initialScene = remote?.scene || null;
+  }
+  state.listingScene = initialScene;
+  state.listingEditorStore ||= createEditorStore({ storageKey: listingSceneKey(listingId) });
+  const metadata = listingMetadataFromForm();
+  state.listingPascalCleanup = await mountPascalStudio({
+    mountNode: document.querySelector("#listingPascalMount"),
+    fallbackNode: document.querySelector("#listingPascalFallbackMount"),
+    fallbackStore: state.listingEditorStore,
+    mode: "embedded",
+    listingId,
+    listingTitle: metadata.title,
+    listingLocation: metadata.location,
+    initialScene,
+    onSave: async (scene) => saveListingSceneForCurrentListing(scene),
+    onBack: () => goToListingWizardStep("material"),
+    onPreview: (scene) => {
+      saveListingSceneForCurrentListing(scene);
+      goToListingWizardStep("preview");
+    }
+  });
+}
+
+function cleanupListingPascalStudio() {
+  if (!state.listingPascalCleanup) return;
+  state.listingPascalCleanup();
+  state.listingPascalCleanup = null;
+}
+
+async function saveListingSceneForCurrentListing(scene) {
+  if (!state.listingDraftId) return;
+  state.listingScene = scene;
+  state.listingSceneSaved = true;
+  saveListingScene(state.listingDraftId, scene);
+  const listing = listings.find((item) => item.id === state.listingDraftId);
+  if (listing) {
+    listing.hasPascalScene = true;
+    listing.sceneUpdatedAt = new Date().toISOString();
+    listing.sceneDraftKey = listingSceneKey(state.listingDraftId);
+    renderListings();
+    renderListingProfile();
+  }
+  if (!state.listingDraftId.startsWith("draft_")) {
+    await fetchJson(`/api/uploads/${encodeURIComponent(state.listingDraftId)}/scene`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ scene })
+    }).catch(() => {});
+  }
 }
 
 function cleanupPascalStudio() {
@@ -864,11 +1159,14 @@ function cleanupPascalStudio() {
 
 async function submitUpload() {
   const form = new FormData();
-  form.append("title", document.querySelector("#listingLocation").value || state.selectedListing.title);
+  form.append("title", document.querySelector("#listingTitle").value || document.querySelector("#listingLocation").value || "Novi oglas");
   form.append("listingType", state.selectedListing.type);
   form.append("purpose", document.querySelector("#listingPurpose").value);
   form.append("price", document.querySelector("#listingPrice").value);
   form.append("size", document.querySelector("#listingSize").value);
+  form.append("rooms", document.querySelector("#listingRooms").value);
+  form.append("floor", document.querySelector("#listingFloor").value);
+  form.append("description", document.querySelector("#listingDescription").value);
   form.append("location", document.querySelector("#listingLocation").value);
   form.append("hasTour", document.querySelector("#hasTour").checked ? "true" : "false");
   form.append("newBuild", document.querySelector("#newBuild").checked ? "true" : "false");
@@ -879,6 +1177,11 @@ async function submitUpload() {
     body: form
   });
   addUploadedListing(data.upload);
+  const previousDraftId = state.listingDraftId;
+  state.listingDraftId = data.upload.id;
+  migrateListingDraft(previousDraftId, data.upload.id);
+  if (state.listingScene) await saveListingSceneForCurrentListing(state.listingScene);
+  saveListingDraftFromForm();
   await loadPublicStats();
   return data;
 }
@@ -926,11 +1229,15 @@ function uploadToPublicListing(upload) {
     priceValue: parseFirstNumber(metadata.price),
     size: metadata.size,
     sizeValue: parseFirstNumber(metadata.size),
-    rooms: "3D",
-    floor: metadata.newBuild ? "Novogradnja" : "Oglas",
+    rooms: metadata.rooms || "3D",
+    floor: metadata.floor || (metadata.newBuild ? "Novogradnja" : "Oglas"),
+    description: metadata.description || "",
     city: String(metadata.location || "").split(",")[0]?.trim(),
     type: upload?.listingType || "stan",
     status: metadata.hasTour === false ? "Oglas dodat" : "3D upload dodat",
+    hasPascalScene: Boolean(upload?.hasPascalScene || upload?.pascalScene || metadata.hasPascalScene),
+    sceneUpdatedAt: upload?.sceneUpdatedAt || metadata.sceneUpdatedAt || "",
+    sceneDraftKey: upload?.sceneDraftKey || metadata.sceneDraftKey || "",
     paid: false,
     quality: 72,
     thumbnail: upload?.thumbnail || ""
@@ -949,9 +1256,13 @@ function normalizeUploadedListing(listing) {
     sizeValue: Number(listing.sizeValue) || 0,
     rooms: listing.rooms || "3D",
     floor: listing.floor || "Oglas",
+    description: listing.description || "",
     city: listing.city || "",
     type: listing.type || "stan",
     status: listing.status || "Upload dodat",
+    hasPascalScene: Boolean(listing.hasPascalScene),
+    sceneUpdatedAt: listing.sceneUpdatedAt || "",
+    sceneDraftKey: listing.sceneDraftKey || "",
     paid: Boolean(listing.paid),
     quality: Number(listing.quality) || 72,
     image: listing.thumbnail ? `url('${listing.thumbnail}')` : fallbackImage
@@ -992,8 +1303,8 @@ function handleInitialRoute() {
 
 function currentRoute() {
   if (window.location.hash === "#/pretraga") return "search";
-  if (window.location.hash === "#/editor" || window.location.hash === "#/studio") return "editor";
-  if (window.location.hash === "#/postavi-oglas") return "post";
+  if (window.location.hash.startsWith("#/editor") || window.location.hash.startsWith("#/studio")) return "editor";
+  if (window.location.hash.startsWith("#/postavi-oglas")) return "post";
   if (window.location.hash.startsWith("#/oglas/")) return "detail";
   return "home";
 }
@@ -1011,6 +1322,8 @@ function renderRoute() {
   }
   if (route === "editor") ensurePascalStudio();
   else cleanupPascalStudio();
+  if (route === "post") prepareListingWizard();
+  else cleanupListingPascalStudio();
   if (route === "search") renderListings();
   if (route === "detail") {
     renderListingDetail();
@@ -1050,6 +1363,10 @@ async function fetchJson(url, options = {}) {
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.message || "Zahtev nije uspeo.");
   return data;
+}
+
+function escapeHtml(value) {
+  return String(value || "").replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[character]));
 }
 
 function prepareViewerLoading() {

@@ -43,8 +43,9 @@ function createScene(nodes = DEMO_NODES) {
   };
 }
 
-export function createEditorStore() {
-  let scene = loadDraft() || createScene();
+export function createEditorStore(options = {}) {
+  const storageKey = options.storageKey || STORAGE_KEY;
+  let scene = loadDraft(storageKey) || createScene();
   let past = [];
   let future = [];
   const listeners = new Set();
@@ -138,14 +139,14 @@ export function createEditorStore() {
       notify();
     },
     save() {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(scene));
+      localStorage.setItem(storageKey, JSON.stringify(scene));
       notify();
     },
     reset() {
       past.push(clone(scene));
       scene = createScene();
       future = [];
-      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(storageKey);
       notify();
     },
     exportJson() {
@@ -154,9 +155,9 @@ export function createEditorStore() {
   };
 }
 
-function loadDraft() {
+function loadDraft(storageKey) {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(storageKey);
     if (!raw) return null;
     const draft = JSON.parse(raw);
     if (!draft?.nodes || !draft?.rootNodeIds) return null;

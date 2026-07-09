@@ -134,6 +134,47 @@ export async function createUpload({ userId, title, listingType, metadata, files
   return upload;
 }
 
+export async function getUploadScene(id, userId) {
+  await initStore();
+  if (postgresSql) {
+    const rows = await postgresSql`
+      select files
+      from uploads
+      where id = ${id} and user_id = ${userId}
+      limit 1
+    `;
+    return rows[0]?.files?.pascalScene || null;
+  }
+  const db = await readJson();
+  const upload = db.uploads.find((item) => item.id === id && item.userId === userId);
+  return upload?.pascalScene || null;
+}
+
+export async function updateUploadScene(id, userId, scene) {
+  await initStore();
+  const sceneUpdatedAt = new Date().toISOString();
+  if (postgresSql) {
+    const rows = await postgresSql`
+      update uploads
+      set files = jsonb_set(
+        jsonb_set(coalesce(files, '{}'::jsonb), '{pascalScene}', ${JSON.stringify(scene)}::jsonb, true),
+        '{sceneUpdatedAt}', ${JSON.stringify(sceneUpdatedAt)}::jsonb, true
+      )
+      where id = ${id} and user_id = ${userId}
+      returning files
+    `;
+    if (!rows[0]) return null;
+    return { ...scene, sceneUpdatedAt };
+  }
+  const db = await readJson();
+  const upload = db.uploads.find((item) => item.id === id && item.userId === userId);
+  if (!upload) return null;
+  upload.pascalScene = { ...scene, sceneUpdatedAt };
+  upload.sceneUpdatedAt = sceneUpdatedAt;
+  await writeJson(db);
+  return upload.pascalScene;
+}
+
 export async function verifyUserEmail(token) {
   await initStore();
   if (!token) return null;
@@ -296,6 +337,9 @@ function mapUploadRow(row) {
     files: payload.files || [],
     metadata: payload.metadata || {},
     thumbnail: payload.thumbnail || "",
+    pascalScene: payload.pascalScene || null,
+    hasPascalScene: Boolean(payload.pascalScene),
+    sceneUpdatedAt: payload.sceneUpdatedAt || "",
     createdAt: row.created_at
   };
 }

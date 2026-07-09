@@ -373,6 +373,15 @@ h2 {
   padding: 16px;
 }
 
+.listing-edit-3d {
+  justify-self: start;
+  min-height: 32px;
+  padding: 0 10px;
+  border-color: rgba(45, 212, 191, .28);
+  color: var(--accent);
+  font-size: 11px;
+}
+
 .listing-body h3,
 .listing-body p {
   margin: 0;
@@ -596,8 +605,135 @@ h2 {
 }
 
 .listing-form input,
-.listing-form select {
+.listing-form select,
+.listing-form textarea {
   width: 100%;
+}
+
+.listing-form textarea {
+  min-height: 104px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, .05);
+  color: var(--ink);
+  resize: vertical;
+}
+
+.listing-description-field {
+  grid-column: 1 / -1;
+}
+
+.listing-wizard-stepper {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.listing-wizard-stepper button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 42px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.listing-wizard-stepper button span {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .08);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.listing-wizard-stepper button.active {
+  border-color: rgba(45, 212, 191, .55);
+  background: rgba(45, 212, 191, .1);
+  color: var(--ink);
+}
+
+.listing-wizard-stepper button.active span {
+  background: var(--accent);
+  color: #04201c;
+}
+
+.listing-wizard-context {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.listing-wizard-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
+.listing-wizard-panel {
+  margin-top: 16px;
+}
+
+.listing-wizard-panel-heading {
+  margin-bottom: 14px;
+}
+
+.listing-wizard-panel-heading h3 {
+  margin: 0 0 6px;
+  font-size: 22px;
+}
+
+.listing-wizard-panel-heading p:not(.eyebrow) {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.listing-pascal-host {
+  min-height: 520px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #0b100e;
+}
+
+.listing-pascal-host #listingPascalMount,
+.listing-pascal-host #listingPascalFallbackMount {
+  min-height: 520px;
+}
+
+.listing-pascal-host .pascal-studio-root {
+  min-height: 520px;
+  border: 0;
+}
+
+.listing-preview-content {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.listing-preview-card {
+  display: grid;
+  gap: 7px;
+  min-height: 76px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, .045);
+}
+
+.listing-preview-card span {
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .checkbox-row {
@@ -1748,8 +1884,28 @@ h2 {
   .mode-picker,
   .listing-form,
   .admin-dashboard,
+  .listing-preview-content,
   .footer-grid {
     grid-template-columns: 1fr;
+  }
+
+  .listing-wizard-stepper {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .listing-wizard-stepper button {
+    min-height: 52px;
+  }
+
+  .listing-wizard-actions > button {
+    width: 100%;
+  }
+
+  .listing-pascal-host,
+  .listing-pascal-host #listingPascalMount,
+  .listing-pascal-host #listingPascalFallbackMount,
+  .listing-pascal-host .pascal-studio-root {
+    min-height: 620px;
   }
 
   .listing-image {

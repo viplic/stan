@@ -21,11 +21,13 @@ import {
   findUserById,
   getAnalyticsStats,
   getListingStats,
+  getUploadScene,
   initStore,
   listPublicUploads,
   listUploads,
   publicUser,
   recordVisit,
+  updateUploadScene,
   verifyUserEmail
 } from "./store.js";
 
@@ -136,6 +138,26 @@ export function createApiApp() {
     response.json({ uploads: await listUploads(user.id) });
   });
 
+  app.get("/api/uploads/:id/scene", async (request, response) => {
+    const user = await requireUser(request, response);
+    if (!user) return;
+    const scene = await getUploadScene(request.params.id, user.id);
+    if (!scene) return response.status(404).json({ error: "scene_not_found", message: "3D raspored nije pronađen." });
+    response.json({ scene });
+  });
+
+  app.put("/api/uploads/:id/scene", async (request, response) => {
+    const user = await requireUser(request, response);
+    if (!user) return;
+    const scene = request.body?.scene;
+    if (!scene || typeof scene !== "object" || !scene.nodes || !scene.rootNodeIds) {
+      return response.status(400).json({ error: "invalid_scene", message: "3D scena nije ispravna." });
+    }
+    const saved = await updateUploadScene(request.params.id, user.id, scene);
+    if (!saved) return response.status(404).json({ error: "listing_not_found", message: "Oglas nije pronađen." });
+    response.json({ scene: saved });
+  });
+
   app.get("/api/public-listings", async (_request, response) => {
     const uploads = await listPublicUploads(12);
     response.json({ listings: uploads.map(publicUploadListing) });
@@ -177,6 +199,9 @@ export function createApiApp() {
           purpose: firstField(fields.purpose) || "",
           price: firstField(fields.price) || "",
           size: firstField(fields.size) || "",
+          rooms: firstField(fields.rooms) || "",
+          floor: firstField(fields.floor) || "",
+          description: firstField(fields.description) || "",
           location: firstField(fields.location) || "",
           newBuild: firstField(fields.newBuild) === "true",
           furnished: firstField(fields.furnished) === "true",
@@ -211,11 +236,15 @@ function publicUploadListing(upload) {
     priceValue,
     size: size || "Kvadratura u pripremi",
     sizeValue,
-    rooms: "3D",
-    floor: metadata.newBuild ? "Novogradnja" : "Oglas",
+    rooms: metadata.rooms || "3D",
+    floor: metadata.floor || (metadata.newBuild ? "Novogradnja" : "Oglas"),
+    description: metadata.description || "",
     city: location.split(",")[0]?.trim() || "",
     type: upload.listingType || "stan",
     status: metadata.hasTour === false ? "Oglas dodat" : "3D upload dodat",
+    hasPascalScene: Boolean(upload.hasPascalScene || upload.pascalScene || metadata.hasPascalScene),
+    sceneUpdatedAt: upload.sceneUpdatedAt || metadata.sceneUpdatedAt || "",
+    sceneDraftKey: upload.sceneDraftKey || metadata.sceneDraftKey || "",
     paid: false,
     quality: 72,
     thumbnail: upload.thumbnail || ""
